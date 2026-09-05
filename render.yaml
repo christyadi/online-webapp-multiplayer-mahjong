@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: mahjong-together
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: codex/mahjong-together
+    autoDeployTrigger: "off"
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.20.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGIN
+        sync: false

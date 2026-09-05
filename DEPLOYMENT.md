@@ -1,0 +1,18 @@
+# Deployment
+
+The release target is one Render Free Node web service connected to the new private GitHub repository. It serves the site, API, and Socket.IO from one process; no database, persistent disk, add-on, custom domain, or second service is used.
+
+## Render settings
+
+- Runtime: Node
+- Node version: 24.20.0
+- Build command: `npm ci && npm run build`
+- Start command: `npm start`
+- Health check: `/api/health`
+- Environment: `NODE_ENV=production` and `APP_ORIGIN` set to the assigned Render HTTPS URL
+- Deploy mode after initial release: manual; automatic deployments disabled
+- Region: Frankfurt when offered for Free services, otherwise the provider default
+
+Before creation, verify that the account's spending controls guarantee no billable overage without changing unrelated services. The public URL and exact redeployment/stop instructions will be added only after real deployment; they will not be invented.
+
+Free-tier startup delays, quotas, and interrupted availability are accepted. All guest sessions and game rooms are in memory, so a server restart ends active games.

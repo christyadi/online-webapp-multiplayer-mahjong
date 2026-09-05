@@ -1,0 +1,17 @@
+{
+  "name": "@mahjong-together/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mahjong-together/shared": "0.1.0",
+    "express": "5.2.1",
+    "socket.io": "4.8.3"
+  }
+}
