@@ -13,7 +13,12 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.config.ts", "tests/e2e/*.ts", "apps/server/src/*.test.ts"],
+          allowDefaultProject: [
+            "*.config.ts",
+            "tests/e2e/*.ts",
+            "apps/server/src/*.test.ts",
+            "apps/server/src/game/*.test.ts",
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },

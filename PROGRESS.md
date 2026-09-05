@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 1 — Establish the project and repeatable commands.
+Milestone 2 — Implement tiles, shuffling, and hand validation.
 
 ## Environment checks (2026-09-05)
 
@@ -54,6 +54,28 @@ Milestone 1 — Establish the project and repeatable commands.
 
 - The same independent read-only reviewer verified all four corrections and found no remaining critical, high, or medium issue.
 
+## Milestone 1 checkpoint
+
+- Commit `be44254` (`chore: establish project foundation`) was pushed to the new private repository `https://github.com/christyadi/mahjong-together` on branch `codex/mahjong-together`.
+
+## Milestone 2 implementation
+
+- Added the fixed 34-type ordering, physical tile DTO/schema, suit/rank metadata, and tile-type ordering helpers to the shared package.
+- Added 136-tile construction, Node-crypto Fisher–Yates shuffling with an injectable test random source, and round-robin initial dealing with the dealer's extra tile.
+- Added normal-hand validation that tries every pair and recursively memoizes pung/chow decompositions, validates declared chow/pung/kong melds, counts kongs as one set, rejects duplicate IDs or more than four copies, and materializes the actual physical winning combination.
+- Added the separate fully concealed seven-distinct-pairs validation; quads are not treated as two pairs.
+- Verification: strict typecheck, lint, and production build pass. Vitest passes 3 files and 17 tests covering 136 identities/copies, deterministic shuffle, invalid random values, deal counts/ownership, legal and illegal sequences, honors, ambiguous decomposition, declared pungs/kongs, valid seven pairs, quad rejection, malformed melds, duplicate IDs, invalid sizes, and decomposition ownership.
+
+## Milestone 2 review round 1
+
+- Confirmed medium: declared concealed chow/pung shapes were accepted even though only kongs can be declared concealed. The common meld validator now rejects any concealed non-kong, with focused regressions.
+- Confirmed low: the exported meld validator did not independently reject repeated physical IDs. It now requires unique IDs within every meld, while whole-hand cross-location uniqueness remains enforced.
+- Corrected verification: typecheck, lint, build, and 17 Vitest tests pass, including concealed/exposed kong acceptance and rejection of concealed chow/pung and repeated-ID pung/kong melds.
+
+## Milestone 2 review round 2
+
+- The same independent read-only reviewer verified both corrections and found no remaining critical, high, or medium issue.
+
 ## Next exact step
 
-Create the Milestone 1 checkpoint commit, then implement Milestone 2 physical tiles, injectable shuffling/dealing, and winning-hand decomposition tests.
+Create and push the Milestone 2 checkpoint, then implement the pure hand state machine and its ownership/phase invariant tests.

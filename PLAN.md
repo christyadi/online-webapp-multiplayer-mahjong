@@ -1,7 +1,7 @@
 # Build plan
 
 - [x] 1. Establish isolated repository, Ponytail guidance, exact toolchain, workspaces, repeatable commands, health route, production serving, review, and checkpoint commit.
-- [ ] 2. Implement physical tiles, crypto/injectable shuffle and deal, normal-hand decomposition, and seven-pairs validation.
+- [x] 2. Implement physical tiles, crypto/injectable shuffle and deal, normal-hand decomposition, and seven-pairs validation.
 - [ ] 3. Implement and invariant-test the pure hand state machine, all claims and kongs, final-wall behavior, and dealer rotation.
 - [ ] 4. Implement guest sessions, private room lobby, seats, host transfer, readiness, capacity, expiry, and browser lobby flows.
 - [ ] 5. Implement reliable multiplayer queues, validation, decision IDs, acknowledgements/deduplication, private snapshots, origins, sizes, and rate limits.
