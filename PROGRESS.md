@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 2 — Implement tiles, shuffling, and hand validation.
+Milestone 3 — Implement the pure hand state machine.
 
 ## Environment checks (2026-09-05)
 
@@ -76,6 +76,28 @@ Milestone 2 — Implement tiles, shuffling, and hand validation.
 
 - The same independent read-only reviewer verified both corrections and found no remaining critical, high, or medium issue.
 
+## Milestone 2 checkpoint
+
+- Commit `2310258` (`feat: implement mahjong hand validation`) was pushed to the private repository on branch `codex/mahjong-together`.
+
+## Milestone 3 implementation
+
+- Added a pure cloned-state transition function for dealer opening, automatic front draws, discards, self-draw wins, discard claim windows, chow/pung/exposed-kong resolution, concealed and added kongs, added-kong robbery, back-wall replacement draws, final-wall wins/draws, and hand completion.
+- Pending discards and pending added kongs remain references to tiles in one owning location until resolution. Accepted claims transfer the physical tile exactly once. Competing claims resolve by win → kong/pung → chow and then clockwise distance, independently of response arrival order.
+- Every discard opportunity and claim/robbery window receives its own decision ID. Wrong-seat, stale, duplicate, wrong-phase, missing-tile, illegal-win, illegal-claim, and illegal-kong requests return typed rejections without mutating the input state.
+- Added invariant checks after every tested accepted and rejected transition: all 136 physical IDs occur once, every type occurs four times, and concealed-hand sizes match the phase while treating a kong as one declared set. Phase construction now copies only common hand fields so stale discard-only properties cannot survive into claim windows or a chow/pung turn.
+- Verification before independent review: strict typecheck, lint, and production build pass. Vitest passes 4 files and 32 tests, including claim arrival orders and passes, exact chow choices, all three kong forms, robbery, front/back draws, final-wall win/draw behavior, state purity, decision response immutability, and dealer rotation.
+
+## Milestone 3 review round 1
+
+- Confirmed medium: an accepted discard response retained the caller's mutable choice object by reference. Caller mutation after validation could therefore change a recorded pass/chow before the remaining responses resolved. Accepted choices are now canonicalized into fresh objects, including a fresh chow tile-ID tuple.
+- Added a focused regression that mutates the submitted chow after acceptance and proves the stored response and eventual resolution remain unchanged.
+- Corrected verification: typecheck, lint, build, and 33 Vitest tests pass.
+
+## Milestone 3 review round 2
+
+- The same independent read-only reviewer verified that accepted claim objects and nested chow tuples are detached from caller-owned input and found no remaining critical, high, or medium issue.
+
 ## Next exact step
 
-Create and push the Milestone 2 checkpoint, then implement the pure hand state machine and its ownership/phase invariant tests.
+Create and push the Milestone 3 checkpoint, then implement guest identity and the room lobby.
