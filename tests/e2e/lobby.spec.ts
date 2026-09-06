@@ -61,6 +61,10 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await expect(host.locator(".table-seat")).toHaveCount(4);
     await expect(host.locator(".seat-position-south .tile-rack")).toBeVisible();
     await expect(host.locator(".seat-position-east .tile-rack")).toHaveCount(0);
+    await expect(host.locator(".player-panel.is-active")).toHaveCount(1);
+    await expect(host.getByText("Playing · choose discard")).toBeVisible();
+    await expect(host.getByText("Waiting for discard")).toHaveCount(3);
+    await expect(host.locator(".player-panel.seat-0")).toHaveClass(/seat-0/);
     await expect(host.locator(".table-center .discard-pool")).toBeVisible();
     await expect(host.locator(".player-panel .discard-strip")).toHaveCount(0);
     await expect(host.locator(".tile-rack .tile-art")).toHaveCount(14);

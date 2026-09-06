@@ -21,3 +21,5 @@
 - [x] Add a randomized 1–5 second bot action cooldown, with an injectable clock/scheduler test path.
 - [x] Render every player's exposed Pung and Chow melds (and exposed Kongs) publicly on their player card.
 - [x] Let players drag and reorder their own concealed tiles while preserving that local order through live updates.
+- [x] Color player cards by seat, highlight the active discard player, and label waiting/observing seats.
+- [x] Add a results-view option to reveal the other players' concealed hands only after hand completion.

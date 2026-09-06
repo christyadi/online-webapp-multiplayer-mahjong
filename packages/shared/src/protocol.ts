@@ -118,6 +118,7 @@ const handResultSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const gameSnapshotSchema = z.object({
+  activeSeat: z.number().int().min(0).max(3).nullable(),
   deadline: z.number().int().nullable(),
   decisionId: z.string().nullable(),
   handId: z.uuid(),
@@ -140,6 +141,7 @@ export const gameSnapshotSchema = z.object({
   roomRevision: z.number().int().nonnegative(),
   serverTime: z.number().int(),
   viewerSeat: z.number().int().min(0).max(3),
+  waitingSeats: z.array(z.number().int().min(0).max(3)),
   wallCount: z.number().int().nonnegative(),
 });
 

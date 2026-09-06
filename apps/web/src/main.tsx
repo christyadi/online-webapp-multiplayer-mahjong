@@ -571,6 +571,7 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
+  const [showOpponentTiles, setShowOpponentTiles] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
   const viewer = game.players.find((player) => player.seat === game.viewerSeat);
   const legal = game.legalActions;
@@ -656,7 +657,7 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
               className={`table-seat seat-position-${seatPosition(player.seat, game.viewerSeat)}`}
               key={player.seat}
             >
-              <PlayerPanel game={game} player={player} />
+              <PlayerPanel game={game} player={player} showOpponentTiles={showOpponentTiles} />
               {player.seat === game.viewerSeat ? (
                 <div className="hand-controls">
                   <div className="tile-rack" aria-label="Your concealed tiles">
@@ -716,7 +717,13 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
           </div>
         </div>
 
-        {game.result === null ? null : <ResultBanner game={game} />}
+        {game.result === null ? null : (
+          <ResultBanner
+            game={game}
+            onToggleOpponentTiles={() => setShowOpponentTiles((visible) => !visible)}
+            showOpponentTiles={showOpponentTiles}
+          />
+        )}
         <details className="help-panel">
           <summary>How to play</summary>
           <p>
@@ -746,9 +753,19 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
 function PlayerPanel({
   game,
   player,
-}: Readonly<{ game: GameSnapshot; player: GameSnapshot["players"][number] }>) {
+  showOpponentTiles,
+}: Readonly<{
+  game: GameSnapshot;
+  player: GameSnapshot["players"][number];
+  showOpponentTiles: boolean;
+}>) {
+  const showTiles =
+    player.seat === game.viewerSeat || (game.phase === "hand-ended" && showOpponentTiles);
+  const status = playerStatus(game, player.seat);
   return (
-    <article className={`player-panel seat-${String(player.seat)}`}>
+    <article
+      className={`player-panel seat-${String(player.seat)} ${status.kind === "active" ? "is-active" : ""}`}
+    >
       <div className="player-heading">
         <strong>{player.nickname ?? `Bot ${seatName(player.seat)}`}</strong>
         <span>{seatName(player.seat)}</span>
@@ -757,12 +774,19 @@ function PlayerPanel({
         {player.connected ? "Connected" : "Reconnecting"} ·{" "}
         {player.controller === "bot" ? "Bot control" : "Human control"}
       </small>
+      <span className={`turn-indicator turn-${status.kind}`} aria-live="polite">
+        {status.label}
+      </span>
       <div
         className="opponent-tiles"
-        aria-label={`${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`}
+        aria-label={
+          showTiles
+            ? `${player.nickname ?? "Player"}'s revealed tiles`
+            : `${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`
+        }
       >
-        {player.seat === game.viewerSeat
-          ? null
+        {showTiles
+          ? (player.concealedTiles ?? []).map((tile) => <TileArt key={tile.id} tile={tile} />)
           : Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
               <span className="tile-back" key={index} />
             ))}
@@ -790,6 +814,21 @@ function PlayerPanel({
       )}
     </article>
   );
+}
+
+function playerStatus(
+  game: GameSnapshot,
+  seat: number,
+): Readonly<{ kind: "active" | "ended" | "observing" | "waiting"; label: string }> {
+  if (game.phase === "hand-ended") return { kind: "ended", label: "Hand ended" };
+  if (game.activeSeat === seat) return { kind: "active", label: "Playing · choose discard" };
+  if (game.waitingSeats.includes(seat)) {
+    if (game.phase === "awaiting-discard") return { kind: "waiting", label: "Waiting for discard" };
+    if (game.phase === "awaiting-discard-claims")
+      return { kind: "waiting", label: "Waiting for claim" };
+    return { kind: "waiting", label: "Waiting for response" };
+  }
+  return { kind: "observing", label: "Observing" };
 }
 
 function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
@@ -945,17 +984,30 @@ function ActionBar({
   );
 }
 
-function ResultBanner({ game }: Readonly<{ game: GameSnapshot }>) {
+function ResultBanner({
+  game,
+  onToggleOpponentTiles,
+  showOpponentTiles,
+}: Readonly<{
+  game: GameSnapshot;
+  onToggleOpponentTiles: () => void;
+  showOpponentTiles: boolean;
+}>) {
   const result = game.result;
   if (result === null) return null;
   return (
     <div className="result-banner">
-      <strong>{result.kind === "draw" ? "Draw hand" : `${seatName(result.winner)} wins`}</strong>
-      <span>
-        {result.kind === "draw"
-          ? "The wall is empty."
-          : `Win by ${result.source.replaceAll("-", " ")}.`}
-      </span>
+      <div>
+        <strong>{result.kind === "draw" ? "Draw hand" : `${seatName(result.winner)} wins`}</strong>
+        <span>
+          {result.kind === "draw"
+            ? "The wall is empty."
+            : `Win by ${result.source.replaceAll("-", " ")}.`}
+        </span>
+      </div>
+      <button className="secondary" onClick={onToggleOpponentTiles} type="button">
+        {showOpponentTiles ? "Hide other hands" : "Show other hands"}
+      </button>
     </div>
   );
 }

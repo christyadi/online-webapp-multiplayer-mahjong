@@ -1,7 +1,12 @@
 import { type GameCommand, type PhysicalTile, type TileType } from "@mahjong-together/shared";
 import { describe, expect, it } from "vitest";
 
-import { startHand, type AwaitingDiscardState, type PlayerHandState } from "../game/state.js";
+import {
+  startHand,
+  type AwaitingDiscardState,
+  type HandEndedState,
+  type PlayerHandState,
+} from "../game/state.js";
 import { createTileSet, type SeatIndex } from "../game/wall.js";
 import type { GuestSession } from "../identity/sessions.js";
 import { RoomStore, type RoomScheduler } from "./rooms.js";
@@ -26,6 +31,8 @@ describe("queued room gameplay", () => {
       });
       const room = startRoom(store, 4);
       const opening = store.getGameSnapshot(guest(0), room.code);
+      expect(opening.activeSeat).toBe(0);
+      expect(opening.waitingSeats).toEqual([1, 2, 3]);
       const drawnTileId = initial.drawnTileId;
       time.now = now;
 
@@ -92,6 +99,8 @@ describe("queued room gameplay", () => {
     ).resolves.toMatchObject({ ok: true });
     const claims = store.getGameSnapshot(guest(1), room.code);
     expect(claims.phase).toBe("awaiting-discard-claims");
+    expect(claims.activeSeat).toBeNull();
+    expect(claims.waitingSeats.length).toBeGreaterThan(0);
     const claimDecision = claims.decisionId;
     await time.advanceTo(10_000);
     const after = store.getGameSnapshot(guest(1), room.code);
@@ -262,6 +271,24 @@ describe("queued room gameplay", () => {
     expect(ownerView.players[1].melds[0]?.tiles).toHaveLength(4);
     const opponentPayload = JSON.stringify(opponentView);
     for (const tile of kongTiles) expect(opponentPayload).not.toContain(tile.id);
+  });
+
+  it("makes every concealed hand available to the results view after the hand ends", () => {
+    const initial = startHand(uuid(), 0, createTileSet());
+    const ended: HandEndedState = {
+      ...structuredClone(initial),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      codeFactory: () => "resultview01",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = startRoom(store, 2);
+    const snapshot = store.getGameSnapshot(guest(0), room.code);
+    expect(snapshot.phase).toBe("hand-ended");
+    expect(snapshot.result).toEqual({ kind: "draw" });
+    expect(snapshot.players.every((player) => player.concealedTiles !== null)).toBe(true);
   });
 });
 

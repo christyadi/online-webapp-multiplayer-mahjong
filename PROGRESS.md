@@ -175,7 +175,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The active task is now explicitly updated to create the actual playable interface requested by the user: a real table view, visible local SVG tile art, hand selection/discard controls, claim/win/kong actions, server deadline display, reconnect/controller status, and hand results.
 - The table is responsive down to narrow mobile widths, uses 44px-or-larger controls, keeps opponent concealed tiles private, exposes a native keyboard-accessible help panel, and renders public discards/meld context plus the current wall count.
 - Added a Chromium end-to-end flow that starts a hand with bots, verifies 14 visible tile faces, selects a tile, enables the discard action, sends it through the live Socket.IO command path, and confirms the table remains synchronized.
-- Verification: formatting, strict typecheck, lint, production build, 78 Vitest tests, and all 5 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
+- Verification: formatting, strict typecheck, lint, production build, 79 Vitest tests, and all 5 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
 ## Milestone 7 feedback integrated
 
@@ -186,6 +186,8 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Added cryptographically random 1–5 second bot cooldowns, clamped and injectable for deterministic scheduler tests.
 - Player cards now show public exposed meld groups with tile faces and Pung/Chow/Kong labels; concealed opponent meld identities remain hidden.
 - Own tiles are draggable/reorderable in a full-width rack, with stable local ordering as authoritative snapshots add or remove tiles.
+- Added seat-specific card colors and authoritative `activeSeat`/`waitingSeats` snapshot fields so every card clearly indicates playing, waiting for discard/claim, observing, or ended state.
+- Added a results-only “Show other hands” option; the server already reveals concealed hands only in `hand-ended` snapshots, and a regression verifies that boundary.
 - Added regression assertions for four seat cards, centralized discards, no per-player discard strips, and value-bearing tile labels.
 
 ## Next exact step

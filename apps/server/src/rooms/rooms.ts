@@ -684,6 +684,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
   // Runtime validation at this private-state/public-DTO boundary prevents an
   // accidental wall or opposing concealed hand from entering a socket payload.
   return gameSnapshotSchema.parse({
+    activeSeat: hand.phase === "awaiting-discard" ? hand.turn : null,
     deadline: room.deadline,
     decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
     handId: hand.handId,
@@ -717,8 +718,19 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
     roomRevision: room.roomRevision,
     serverTime: now,
     viewerSeat,
+    waitingSeats: waitingSeatsFor(hand),
     wallCount: hand.wall.length,
   });
+}
+
+function waitingSeatsFor(hand: HandState): SeatIndex[] {
+  const seats = [0, 1, 2, 3] as const;
+  if (hand.phase === "awaiting-discard") {
+    return seats.filter((seat) => seat !== hand.turn);
+  }
+  if (hand.phase === "awaiting-discard-claims") return hand.eligible.map(({ seat }) => seat);
+  if (hand.phase === "awaiting-kong-robbery") return [...hand.eligible];
+  return [];
 }
 
 function requirePublicDiscard(hand: HandState, seat: SeatIndex, tileId: string) {

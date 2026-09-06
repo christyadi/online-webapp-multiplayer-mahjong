@@ -186,9 +186,31 @@ a {
 }
 .player-panel {
   min-width: 0;
+  border: 2px solid transparent;
   border-radius: 0.7rem;
   padding: 0.65rem;
   background: rgb(9 48 37 / 40%);
+}
+.player-panel.seat-0 {
+  border-color: #f4d35e;
+  background: linear-gradient(145deg, rgb(128 86 32 / 78%), rgb(76 61 29 / 76%));
+}
+.player-panel.seat-1 {
+  border-color: #f7a072;
+  background: linear-gradient(145deg, rgb(127 63 45 / 78%), rgb(76 45 38 / 76%));
+}
+.player-panel.seat-2 {
+  border-color: #8ecae6;
+  background: linear-gradient(145deg, rgb(39 87 112 / 78%), rgb(35 61 77 / 76%));
+}
+.player-panel.seat-3 {
+  border-color: #b8e986;
+  background: linear-gradient(145deg, rgb(58 105 69 / 78%), rgb(39 70 51 / 76%));
+}
+.player-panel.is-active {
+  box-shadow:
+    0 0 0 3px rgb(255 250 206 / 72%),
+    0 0.5rem 1.25rem rgb(0 0 0 / 22%);
 }
 .player-panel small {
   display: block;
@@ -198,11 +220,35 @@ a {
   color: #d9eee2;
   font-size: 0.8rem;
 }
+.turn-indicator {
+  display: inline-block;
+  margin-top: 0.45rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  color: #173b2e;
+  background: #d9eee2;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.turn-active {
+  color: #4c3510;
+  background: #f8e8bb;
+}
+.turn-ended,
+.turn-observing {
+  color: #e6edf0;
+  background: rgb(23 32 51 / 38%);
+}
 .opponent-tiles {
   display: flex;
   flex-wrap: wrap;
   gap: 0.18rem;
   margin-top: 0.5rem;
+}
+.opponent-tiles .tile-art {
+  width: 1.2rem;
+  height: 1.7rem;
 }
 .meld-strip {
   display: flex;
@@ -420,6 +466,10 @@ a {
   padding: 1rem;
   color: #4c3510;
   background: #f6e5ad;
+}
+.result-banner > div {
+  display: grid;
+  gap: 0.2rem;
 }
 .help-panel {
   margin-top: 0.75rem;
