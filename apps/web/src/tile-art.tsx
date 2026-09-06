@@ -60,6 +60,7 @@ export function TileArt({ tile, selected = false, onClick }: TileArtProperties) 
       role="img"
       viewBox="0 0 64 88"
     >
+      <title>{label}</title>
       <rect className="tile-shadow" height="84" rx="6" width="58" x="4" y="4" />
       <rect className="tile-face" height="80" rx="5" width="54" x="3" y="2" />
       <text className="tile-rank" x="8" y="14">
@@ -80,6 +81,12 @@ export function TileArt({ tile, selected = false, onClick }: TileArtProperties) 
 
 function tileLabel(type: TileType): string {
   const details = suitedTileDetails(type);
-  if (details !== null) return `${String(details.rank)} ${details.suit}`;
-  return type === "white" ? "white dragon" : `${type} wind/dragon`;
+  if (details !== null) {
+    return `${String(details.rank)} of ${details.suit} · value ${String(details.rank)}`;
+  }
+  const honorName =
+    type === "east" || type === "south" || type === "west" || type === "north"
+      ? `${type} wind`
+      : `${type} dragon`;
+  return `${honorName} · value 0`;
 }

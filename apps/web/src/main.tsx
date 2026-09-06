@@ -640,43 +640,44 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
           </div>
         </header>
 
-        <div className="table-felt">
-          <div className="player-row opponents" aria-label="Other players">
-            {game.players
-              .filter((player) => player.seat !== game.viewerSeat)
-              .map((player) => (
-                <PlayerPanel game={game} key={player.seat} player={player} />
-              ))}
-          </div>
-          <div className="table-middle">
+        <div className="table-felt" aria-label="Four-sided mahjong table">
+          {game.players.map((player) => (
+            <div
+              className={`table-seat seat-position-${seatPosition(player.seat)}`}
+              key={player.seat}
+            >
+              <PlayerPanel game={game} player={player} />
+              {player.seat === game.viewerSeat ? (
+                <div className="hand-controls">
+                  <div className="tile-rack" aria-label="Your concealed tiles">
+                    {(viewer.concealedTiles ?? []).map((tile) => (
+                      <TileArt
+                        key={tile.id}
+                        onClick={() => setSelectedTileId(tile.id)}
+                        selected={selectedTileId === tile.id}
+                        tile={tile}
+                      />
+                    ))}
+                  </div>
+                  <ActionBar
+                    commandPending={commandPending}
+                    game={game}
+                    legal={legal}
+                    onAction={send}
+                    selectedTileId={selectedTileId}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))}
+          <div className="table-center">
             <div className="wall-counter">Wall · {game.wallCount}</div>
+            <DiscardPool game={game} />
             {game.pendingDiscard === null ? null : (
               <div className="pending-discard">
-                Discarded tile <TileArt tile={game.pendingDiscard.tile} />
+                Current discard <TileArt tile={game.pendingDiscard.tile} />
               </div>
             )}
-          </div>
-          <div className="player-row own-player">
-            <PlayerPanel game={game} player={viewer} />
-            <div className="hand-controls">
-              <div className="tile-rack" aria-label="Your concealed tiles">
-                {(viewer.concealedTiles ?? []).map((tile) => (
-                  <TileArt
-                    key={tile.id}
-                    onClick={() => setSelectedTileId(tile.id)}
-                    selected={selectedTileId === tile.id}
-                    tile={tile}
-                  />
-                ))}
-              </div>
-              <ActionBar
-                commandPending={commandPending}
-                game={game}
-                legal={legal}
-                onAction={send}
-                selectedTileId={selectedTileId}
-              />
-            </div>
           </div>
         </div>
 
@@ -731,12 +732,29 @@ function PlayerPanel({
               <span className="tile-back" key={index} />
             ))}
       </div>
-      <div className="discard-strip">
-        {player.discards.slice(-8).map((tile) => (
-          <TileArt key={tile.id} tile={tile} />
-        ))}
-      </div>
     </article>
+  );
+}
+
+function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
+  const discards = game.players.flatMap((player) =>
+    player.discards.map((tile) => ({ player, tile })),
+  );
+  return (
+    <div className="discard-pool" aria-label="All discarded tiles">
+      <span className="discard-pool-label">Discard pool</span>
+      {discards.length === 0 ? (
+        <span className="discard-empty">No discards yet</span>
+      ) : (
+        <div className="discard-grid">
+          {discards.map(({ player, tile }) => (
+            <span className={`discard-tile seat-accent-${String(player.seat)}`} key={tile.id}>
+              <TileArt tile={tile} />
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -888,6 +906,19 @@ function ResultBanner({ game }: Readonly<{ game: GameSnapshot }>) {
 
 function seatName(seat: number): string {
   return SEAT_NAMES[seat as 0 | 1 | 2 | 3];
+}
+
+function seatPosition(seat: number): "north" | "east" | "south" | "west" {
+  switch (seat) {
+    case 0:
+      return "east";
+    case 1:
+      return "south";
+    case 2:
+      return "west";
+    default:
+      return "north";
+  }
 }
 
 async function requestJson<T>(

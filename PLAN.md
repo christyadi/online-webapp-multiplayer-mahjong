@@ -10,3 +10,9 @@
 - [ ] 8. Verify integrated two-human/two-bot play across desktop engines and mobile Chromium, including reconnect and rematch.
 - [ ] 9. Create the private GitHub repository and one zero-spend Render Free service; verify the public page, health, sockets, invite deep links, reconnect, and hand/rematch.
 - [ ] 10. Complete three specialist final reviews and corrected re-review, release commit, and user handoff; leave the branch unmerged.
+
+## Milestone 7 UI refinement feedback
+
+- [x] Show each tile's name and value on hover (and retain the same label for keyboard/screen-reader access).
+- [x] Keep every player's discarded tiles in one central discard pool in the middle of the table; do not repeat them inside player cards.
+- [x] Present a four-sided table layout with one player card on each side, preserving a readable single-column mobile fallback.

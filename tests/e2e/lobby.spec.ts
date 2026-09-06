@@ -54,7 +54,14 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
 
     await expect(host.getByRole("heading", { name: "Hand starting" })).toBeVisible();
     await expect(host.locator(".seat-detail", { hasText: "Bot" })).toHaveCount(2);
+    await expect(host.locator(".table-seat")).toHaveCount(4);
+    await expect(host.locator(".table-center .discard-pool")).toBeVisible();
+    await expect(host.locator(".player-panel .discard-strip")).toHaveCount(0);
     await expect(host.locator(".tile-rack .tile-art")).toHaveCount(14);
+    await expect(host.locator(".tile-rack .tile-art").first()).toHaveAttribute(
+      "aria-label",
+      /value/,
+    );
     const discard = host.getByRole("button", { name: "Discard selected" });
     await expect(discard).toBeDisabled();
     await host.locator(".tile-rack .tile-button").first().click();
