@@ -39,3 +39,5 @@
 - [x] Reset readiness and release disconnected humans when a hand completes.
 - [x] Let the host return a completed table to the lobby, clearing bot seats so friends can join before the next hand.
 - [x] Release a host who disconnects on the results screen and transfer rematch and lobby controls to the next connected human.
+- [x] Run the integrated two-human/two-bot table flow at desktop Chromium, iPad Pro 11 Chromium, and Safari-engine sizes, including a live table reload/reconnect.
+- [ ] Exercise the completed-hand rematch banner through a browser result flow before closing the cross-browser milestone.

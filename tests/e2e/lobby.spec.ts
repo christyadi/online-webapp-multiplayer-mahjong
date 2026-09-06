@@ -19,7 +19,15 @@ test("isolated guests keep distinct seats through joins and refresh", async ({ b
     }
 
     await expect(host.locator(".seat-detail", { hasText: "Same name" })).toHaveCount(4);
-    await host.getByRole("button", { name: "Refresh players" }).click();
+    const refreshed = host.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/rooms/current" &&
+        response.request().method() === "GET",
+    );
+    await host
+      .getByRole("button", { name: "Refresh players" })
+      .evaluate((button: HTMLButtonElement) => button.click());
+    expect((await refreshed).status()).toBe(200);
 
     await guests[0].reload();
     await expect(guests[0].getByText("You are South")).toBeVisible();
@@ -67,6 +75,9 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await expect(host.locator(".player-panel.seat-0")).toHaveClass(/seat-0/);
     await expect(host.locator(".table-center .discard-pool")).toBeVisible();
     await expect(host.locator(".player-panel .discard-strip")).toHaveCount(0);
+    await host.reload();
+    await expect(host.getByRole("heading", { name: "Hand starting" })).toBeVisible();
+    await expect(host.locator(".seat-position-south .tile-rack .tile-art")).toHaveCount(14);
     await expect(host.locator(".tile-rack .tile-art")).toHaveCount(14);
     await expect(host.locator(".tile-rack .tile-art").first()).toHaveAttribute(
       "aria-label",
@@ -174,7 +185,9 @@ test("an expired current room becomes a clear recoverable screen", async ({ page
     await route.fulfill({ contentType: "application/json", json: { room: null }, status: 200 });
   });
 
-  await page.getByRole("button", { name: "Refresh players" }).click();
+  await page
+    .getByRole("button", { name: "Refresh players" })
+    .evaluate((button: HTMLButtonElement) => button.click());
 
   await expect(page.getByRole("heading", { name: "Room expired" })).toBeVisible();
   await expect(page.getByText("This private room is no longer available")).toBeVisible();

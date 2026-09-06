@@ -213,6 +213,17 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The review confirmed that rematch timer cancellation and the shared mutation latch prevent manual/automatic start races; completed-table disconnects transfer host controls without preserving stale membership.
 - Verification after correction: formatting, strict typecheck, lint, production build, 82 Vitest tests, and all 6 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
+## Milestone 8 verification in progress
+
+- Added a named iPad Pro 11 Chromium project and reproducible tablet/WebKit test commands. The responsive two-human/two-bot table flow now reloads the active host page and verifies that the same private hand reconnects with all 14 viewer tiles.
+- All six browser flows pass in desktop Chromium and iPad Pro 11 Chromium. The same six flows pass in the Safari-engine WebKit project; refresh actions are asserted through the resulting same-origin request to avoid a Windows WebKit pointer-completion stall after synchronization.
+- Firefox has not been installed or run during this verification pass, as requested.
+
+## Deployment readiness check
+
+- Render is signed in to the Hobby workspace with no card, no pending charges, zero used free-instance hours, and 750 included free-instance hours. The account page also states that usage beyond included limits is chargeable, so a hard zero-spend guarantee was not available to verify.
+- No service was created and no source access was granted. The ready-to-configure Web Service page requires a GitHub OAuth connection before the private repository can be selected; its setup tab is preserved for an explicit user decision.
+
 ## Next exact step
 
-Continue with integrated desktop/mobile browser verification, then prepare the Render deployment checks; Firefox remains deferred.
+Exercise the completed-hand rematch banner in a browser result flow. Deployment then requires the user's explicit decision on GitHub OAuth access and accepting Render's included-usage overage policy; Firefox remains deferred.

@@ -16,6 +16,8 @@ npm run typecheck
 npm run lint
 npm test
 npm run test:e2e
+npm run test:e2e:tablet
+npm run test:e2e:webkit
 npm run test:e2e:all
 npm run build
 npm start
@@ -23,6 +25,6 @@ npm start
 
 Development serves Vite on `http://localhost:5173` and proxies API and Socket.IO traffic to the server on port 3001. Production uses one Express/Socket.IO process to serve the built site and multiplayer connections.
 
-`test:e2e` runs the current Chromium development gate. `test:e2e:all` is the final Chromium, Firefox, and WebKit gate; Firefox is temporarily deferred because the newest downloaded patched build did not start on this Windows host.
+`test:e2e` runs the desktop Chromium gate. `test:e2e:tablet` runs the iPad Pro 11 viewport with Chromium, and `test:e2e:webkit` runs the Safari-engine gate. `test:e2e:all` includes Firefox too; Firefox is temporarily deferred at the user's direction.
 
 See [SPEC.md](./SPEC.md), [RULES.md](./RULES.md), and [DEPLOYMENT.md](./DEPLOYMENT.md).

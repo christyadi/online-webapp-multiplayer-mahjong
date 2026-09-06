@@ -19,6 +19,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test --project=chromium",
+    "test:e2e:tablet": "playwright test --project=tablet-chromium",
+    "test:e2e:webkit": "playwright test --project=webkit",
     "test:e2e:all": "playwright test",
     "format": "prettier --check ."
   },
