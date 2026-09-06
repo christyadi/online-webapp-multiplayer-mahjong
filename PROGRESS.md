@@ -217,6 +217,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 - Added a named iPad Pro 11 Chromium project and reproducible tablet/WebKit test commands. The responsive two-human/two-bot table flow now reloads the active host page and verifies that the same private hand reconnects with all 14 viewer tiles.
 - All six browser flows pass in desktop Chromium and iPad Pro 11 Chromium. The same six flows pass in the Safari-engine WebKit project; refresh actions are asserted through the resulting same-origin request to avoid a Windows WebKit pointer-completion stall after synchronization.
+- Added a separate result-flow Playwright configuration backed by a test-only server entrypoint. It injects completed draw hands, confirms that opting out prevents any rematch for more than 15 seconds, then starts the next real hand manually; it also proves the enabled-by-default timer does not fire early and sends exactly one automatic rematch request without an error. The fixture is test-suite code only: production server startup never imports it and no cheat route exists.
 - Firefox has not been installed or run during this verification pass, as requested.
 
 ## Deployment readiness check
@@ -224,6 +225,12 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Render is signed in to the Hobby workspace with no card, no pending charges, zero used free-instance hours, and 750 included free-instance hours. The account page also states that usage beyond included limits is chargeable, so a hard zero-spend guarantee was not available to verify.
 - No service was created and no source access was granted. The ready-to-configure Web Service page requires a GitHub OAuth connection before the private repository can be selected; its setup tab is preserved for an explicit user decision.
 
+## Milestone 8 result-flow review
+
+- The first independent review found that the initial result test did not establish the full 15-second lower bound, prove that opting out cancelled rematch, or rule out duplicate start requests. The corrected browser tests keep the opt-out result visible for 16 seconds with zero rematch requests, and retain the automatic result at 14 seconds before confirming exactly one successful rematch and no error alert.
+- The required corrected re-review found no remaining critical, high, or medium issue. It confirmed that the fixture uses the real app, Socket.IO, HTTP routes, and built client while remaining unimported by production startup and exposing no test endpoint.
+- Verification: format, lint, strict typecheck, production build, and all 82 unit/integration tests pass. Default Chromium has 6 passing flows; iPad Pro 11 Chromium has 6; the Safari-engine active-table flow passes; and the dedicated result suite has 2 passing Chromium flows. Firefox remains intentionally deferred.
+
 ## Next exact step
 
-Exercise the completed-hand rematch banner in a browser result flow. Deployment then requires the user's explicit decision on GitHub OAuth access and accepting Render's included-usage overage policy; Firefox remains deferred.
+Deployment requires the user's explicit decision on GitHub OAuth access and accepting Render's included-usage overage policy; Firefox remains deferred.
