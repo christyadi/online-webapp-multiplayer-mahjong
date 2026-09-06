@@ -213,11 +213,13 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The review confirmed that rematch timer cancellation and the shared mutation latch prevent manual/automatic start races; completed-table disconnects transfer host controls without preserving stale membership.
 - Verification after correction: formatting, strict typecheck, lint, production build, 82 Vitest tests, and all 6 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
-## Milestone 8 verification in progress
+## Milestone 8 verification
 
 - Added a named iPad Pro 11 Chromium project and reproducible tablet/WebKit test commands. The responsive two-human/two-bot table flow now reloads the active host page and verifies that the same private hand reconnects with all 14 viewer tiles.
 - All six browser flows pass in desktop Chromium and iPad Pro 11 Chromium. The same six flows pass in the Safari-engine WebKit project; refresh actions are asserted through the resulting same-origin request to avoid a Windows WebKit pointer-completion stall after synchronization.
 - Added a separate result-flow Playwright configuration backed by a test-only server entrypoint. It injects completed draw hands, confirms that opting out prevents any rematch for more than 15 seconds, then starts the next real hand manually; it also proves the enabled-by-default timer does not fire early and sends exactly one automatic rematch request without an error. The fixture is test-suite code only: production server startup never imports it and no cheat route exists.
+- Added a separate claim-flow Playwright configuration with a controlled real hand that gives the joining human exactly three Chow choices. The browser test proves the UI renders one Chow button, labels every sequence exactly, resolves the selected middle Chow, and exposes its three tiles to both the claimant and host. This is test-suite-only startup injection, not a production route or runtime flag.
+- The claim-flow review initially found that the test counted an exposed Chow without proving the selected combination was committed. The corrected test now checks the exact `2 of dots`, `4 of dots`, and discarded `3 of dots` accessible labels on both clients. The independent correction re-review found no remaining critical, high, or medium issue.
 - Firefox has not been installed or run during this verification pass, as requested.
 
 ## Deployment readiness check
@@ -229,7 +231,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 - The first independent review found that the initial result test did not establish the full 15-second lower bound, prove that opting out cancelled rematch, or rule out duplicate start requests. The corrected browser tests keep the opt-out result visible for 16 seconds with zero rematch requests, and retain the automatic result at 14 seconds before confirming exactly one successful rematch and no error alert.
 - The required corrected re-review found no remaining critical, high, or medium issue. It confirmed that the fixture uses the real app, Socket.IO, HTTP routes, and built client while remaining unimported by production startup and exposing no test endpoint.
-- Verification: format, lint, strict typecheck, production build, and all 82 unit/integration tests pass. Default Chromium has 6 passing flows; iPad Pro 11 Chromium has 6; the Safari-engine active-table flow passes; and the dedicated result suite has 2 passing Chromium flows. Firefox remains intentionally deferred.
+- Verification: format, lint, strict typecheck, production build, and all 82 unit/integration tests pass. Default Chromium has 6 passing flows; iPad Pro 11 Chromium has 6; the Safari-engine active-table flow passes; the dedicated result suite has 2 passing Chromium flows; and the dedicated Chow-claim suite has 1 passing Chromium flow. Firefox remains intentionally deferred.
 
 ## Next exact step
 

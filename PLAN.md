@@ -6,8 +6,8 @@
 - [x] 4. Implement guest sessions, private room lobby, seats, host transfer, readiness, capacity, expiry, and browser lobby flows.
 - [x] 5. Implement reliable multiplayer queues, validation, decision IDs, acknowledgements/deduplication, private snapshots, origins, sizes, and rate limits.
 - [x] 6. Implement deterministic bots, timeouts, disconnect takeover/rejoin, duplicate-tab control, restart behavior, and 100 simulations.
-- [ ] 7. Complete the responsive, accessible playable interface, local SVG tile art, help, reconnect, results, and rematches.
-- [ ] 8. Verify integrated two-human/two-bot play across desktop engines and mobile Chromium, including reconnect and rematch.
+- [x] 7. Complete the responsive, accessible playable interface, local SVG tile art, help, reconnect, results, and rematches.
+- [x] 8. Verify integrated two-human/two-bot play across desktop engines and mobile Chromium, including reconnect, claims, and rematch (Firefox deferred at the user's direction).
 - [ ] 9. Create the private GitHub repository and one zero-spend Render Free service; verify the public page, health, sockets, invite deep links, reconnect, and hand/rematch.
 - [ ] 10. Complete three specialist final reviews and corrected re-review, release commit, and user handoff; leave the branch unmerged.
 
@@ -41,3 +41,4 @@
 - [x] Release a host who disconnects on the results screen and transfer rematch and lobby controls to the next connected human.
 - [x] Run the integrated two-human/two-bot table flow at desktop Chromium, iPad Pro 11 Chromium, and Safari-engine sizes, including a live table reload/reconnect.
 - [x] Exercise the completed-hand rematch banner through a browser result flow before closing the cross-browser milestone.
+- [x] Exercise an in-browser Chow choice with its exact selector labels and confirm the exposed meld reaches both human players.

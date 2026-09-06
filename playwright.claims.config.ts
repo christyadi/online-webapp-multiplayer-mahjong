@@ -1,11 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 4173;
+const port = 4175;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: ["results.spec.ts", "claims.spec.ts"],
-  fullyParallel: true,
+  testMatch: "claims.spec.ts",
+  fullyParallel: false,
   forbidOnly: true,
   retries: 0,
   reporter: "list",
@@ -14,7 +14,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run build && npm start",
+    command: "npm run build && tsx tests/e2e/claims-server.ts",
     env: {
       APP_ORIGIN: `http://127.0.0.1:${String(port)}`,
       NODE_ENV: "production",
@@ -24,10 +24,5 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "tablet-chromium", use: { ...devices["iPad Pro 11"], browserName: "chromium" } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
-  ],
+  projects: [{ name: "claim-chromium", use: { ...devices["Desktop Chrome"] } }],
 });
