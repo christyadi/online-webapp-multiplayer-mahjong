@@ -107,6 +107,7 @@ describe("queued room gameplay", () => {
       codeFactory: () => "takeovercode",
       handFactory: () => structuredClone(initial),
       scheduler: time.schedule,
+      botDelayMs: () => 1_000,
     });
     const room = startRoom(store, 4);
     const opening = store.getGameSnapshot(guest(0), room.code);
@@ -116,7 +117,7 @@ describe("queued room gameplay", () => {
     expect(disconnected.deadline).toBe(opening.deadline);
     expect(disconnected.players[0]).toMatchObject({ connected: false, controller: "bot" });
     await store.connect(guest(0).guestId);
-    await time.advanceTo(700);
+    await time.advanceTo(1_000);
 
     const reconnected = store.getGameSnapshot(guest(0), room.code);
     expect(reconnected.decisionId).toBe(opening.decisionId);
@@ -124,12 +125,32 @@ describe("queued room gameplay", () => {
     expect(reconnected.players[0].discards).toHaveLength(0);
 
     await store.disconnect(guest(0).guestId);
-    await time.advanceTo(1_400);
+    await time.advanceTo(2_000);
     const takenOver = store.getGameSnapshot(guest(0), room.code);
     expect(takenOver.decisionId).not.toBe(opening.decisionId);
     expect(takenOver.players[0].discards).toHaveLength(1);
     await store.connect(guest(0).guestId);
     expect(store.getGameSnapshot(guest(0), room.code).players[0].controller).toBe("human");
+  });
+
+  it("waits for the configured bot cooldown and clamps it to one through five seconds", async () => {
+    const initial = startHand(uuid(), 0, createTileSet());
+    const delays: number[] = [];
+    const store = new RoomStore({
+      botDelayMs: () => 4_321,
+      codeFactory: () => "botdelay0012",
+      handFactory: () => structuredClone(initial),
+      scheduler: (delayMs) => {
+        delays.push(delayMs);
+        return () => undefined;
+      },
+    });
+    const room = startRoom(store, 2);
+    await store.disconnect(guest(0).guestId);
+    expect(delays).toContain(4_321);
+    expect(delays.every((delay) => delay >= 1_000 || delay === 30_000)).toBe(true);
+    expect(delays.every((delay) => delay <= 30_000)).toBe(true);
+    expect(room.code).toBe("botdelay0012");
   });
 
   it("finishes the hand through scheduled bots after the last human disconnects", async () => {
@@ -139,6 +160,7 @@ describe("queued room gameplay", () => {
       codeFactory: () => "allbotcode01",
       handFactory: () => startHand(uuid(), 0, createTileSet()),
       scheduler: time.schedule,
+      botDelayMs: () => 1_000,
     });
     const room = startRoom(store, 2);
     await store.disconnect(guest(0).guestId);

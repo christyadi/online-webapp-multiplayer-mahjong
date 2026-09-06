@@ -393,7 +393,6 @@ function Lobby({
       <Table
         error={error}
         game={game}
-        key={`${game.handId}:${String(game.decisionId ?? game.roomRevision)}`}
         onError={onError}
         onLeave={onLeave}
         realtime={realtime}
@@ -570,10 +569,21 @@ type TableProperties = Readonly<{
 
 function Table({ error, game, onError, onLeave, realtime, room }: TableProperties) {
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
-  const [commandPending, setCommandPending] = useState(false);
+  const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
+  const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [clock, setClock] = useState(() => Date.now());
   const viewer = game.players.find((player) => player.seat === game.viewerSeat);
   const legal = game.legalActions;
+  const commandPending = pendingDecisionId === game.decisionId;
+  const serverTiles = viewer?.concealedTiles ?? [];
+  const serverTileIds = serverTiles.map((tile) => tile.id);
+  const orderedTileIds = [
+    ...tileOrder.filter((id) => serverTileIds.includes(id)),
+    ...serverTileIds.filter((id) => !tileOrder.includes(id)),
+  ];
+  const orderedTiles = orderedTileIds
+    .map((id) => serverTiles.find((tile) => tile.id === id))
+    .filter((tile): tile is (typeof serverTiles)[number] => tile !== undefined);
   const deadlineRemaining =
     game.deadline === null
       ? null
@@ -592,7 +602,7 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
   const send = (action: GameCommand["action"]) => {
     if (realtime === null || !realtime.connected || game.decisionId === null || commandPending)
       return;
-    setCommandPending(true);
+    setPendingDecisionId(game.decisionId);
     onError(null);
     const command: GameCommand = {
       action,
@@ -604,7 +614,7 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
     realtime
       .timeout(5_000)
       .emit("game:command", command, (timeoutError: unknown, input: unknown) => {
-        setCommandPending(false);
+        setPendingDecisionId(null);
         if (timeoutError !== null && timeoutError !== undefined) {
           onError("The table did not respond. Your hand will resync shortly.");
           return;
@@ -650,13 +660,38 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
               {player.seat === game.viewerSeat ? (
                 <div className="hand-controls">
                   <div className="tile-rack" aria-label="Your concealed tiles">
-                    {(viewer.concealedTiles ?? []).map((tile) => (
-                      <TileArt
+                    {orderedTiles.map((tile) => (
+                      <div
+                        aria-label={`Move ${tile.id}`}
+                        className="draggable-tile"
+                        data-tile-id={tile.id}
+                        draggable
                         key={tile.id}
-                        onClick={() => setSelectedTileId(tile.id)}
-                        selected={selectedTileId === tile.id}
-                        tile={tile}
-                      />
+                        onDragOver={(event) => event.preventDefault()}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", tile.id);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const sourceId = event.dataTransfer.getData("text/plain");
+                          if (sourceId === "" || sourceId === tile.id) return;
+                          setTileOrder((current) =>
+                            moveTile(
+                              current.length === 0 ? serverTileIds : current,
+                              sourceId,
+                              tile.id,
+                              serverTileIds,
+                            ),
+                          );
+                        }}
+                      >
+                        <TileArt
+                          onClick={() => setSelectedTileId(tile.id)}
+                          selected={selectedTileId === tile.id}
+                          tile={tile}
+                        />
+                      </div>
                     ))}
                   </div>
                   <ActionBar
@@ -732,6 +767,27 @@ function PlayerPanel({
               <span className="tile-back" key={index} />
             ))}
       </div>
+      {player.melds.length === 0 ? null : (
+        <div className="meld-strip" aria-label={`${player.nickname ?? "Player"} exposed melds`}>
+          {player.melds.map((meld, index) => (
+            <div className="meld-group" key={`${meld.kind}-${String(index)}`}>
+              <span className="meld-name">
+                {meld.kind === "chow" ? "Chow" : meld.kind === "pung" ? "Pung" : "Kong"}
+              </span>
+              <div className="meld-tiles">
+                {(meld.tiles ?? []).map((tile) => (
+                  <TileArt key={tile.id} tile={tile} />
+                ))}
+                {meld.tiles === null
+                  ? Array.from({ length: meld.tileCount }, (_, tileIndex) => (
+                      <span className="tile-back" key={tileIndex} />
+                    ))
+                  : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </article>
   );
 }
@@ -920,6 +976,25 @@ function seatPosition(seat: number, viewerSeat: number): "north" | "east" | "sou
     default:
       return "east";
   }
+}
+
+function moveTile(
+  currentOrder: readonly string[],
+  sourceId: string,
+  targetId: string,
+  validIds: readonly string[],
+): string[] {
+  const order = [
+    ...currentOrder.filter((id) => validIds.includes(id)),
+    ...validIds.filter((id) => !currentOrder.includes(id)),
+  ];
+  const sourceIndex = order.indexOf(sourceId);
+  const targetIndex = order.indexOf(targetId);
+  if (sourceIndex === -1 || targetIndex === -1) return order;
+  const [source] = order.splice(sourceIndex, 1);
+  if (source === undefined) return order;
+  order.splice(sourceIndex < targetIndex ? targetIndex - 1 : targetIndex, 0, source);
+  return order;
 }
 
 async function requestJson<T>(

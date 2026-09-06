@@ -18,3 +18,6 @@
 - [x] Present a four-sided table layout with one player card on each side, preserving a readable single-column mobile fallback.
 - [x] Make the gameplay table occupy the full viewport on desktop, with a content-sized mobile fallback.
 - [x] Anchor the viewer's player card and full hand rack to the lower side of the table, rotating the other seats relative to the viewer.
+- [x] Add a randomized 1–5 second bot action cooldown, with an injectable clock/scheduler test path.
+- [x] Render every player's exposed Pung and Chow melds (and exposed Kongs) publicly on their player card.
+- [x] Let players drag and reorder their own concealed tiles while preserving that local order through live updates.

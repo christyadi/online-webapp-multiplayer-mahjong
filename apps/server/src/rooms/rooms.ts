@@ -63,6 +63,7 @@ export class RoomError extends Error {
 }
 
 type RoomStoreOptions = Readonly<{
+  botDelayMs?: () => number;
   clock?: () => number;
   codeFactory?: () => string;
   handFactory?: (dealer: SeatIndex) => HandState;
@@ -73,6 +74,7 @@ type RoomStoreOptions = Readonly<{
 export type RoomScheduler = (delayMs: number, callback: () => void) => () => void;
 
 export class RoomStore {
+  readonly #botDelayMs: () => number;
   readonly #clock: () => number;
   readonly #codeFactory: () => string;
   readonly #guestRooms = new Map<string, string>();
@@ -84,6 +86,7 @@ export class RoomStore {
   readonly #scheduler: RoomScheduler;
 
   constructor(options: RoomStoreOptions = {}) {
+    this.#botDelayMs = options.botDelayMs ?? (() => randomInt(1_000, 5_001));
     this.#clock = options.clock ?? Date.now;
     this.#codeFactory = options.codeFactory ?? generateRoomCode;
     this.#handFactory =
@@ -518,7 +521,8 @@ export class RoomStore {
       const capturedHandId = hand.handId;
       const capturedDecisionId = hand.decisionId;
       const remaining = room.deadline - this.#clock();
-      const delay = Math.max(0, Math.min(700, remaining > 0 ? remaining - 1 : 0));
+      const cooldown = boundedBotDelay(this.#botDelayMs());
+      const delay = Math.max(0, Math.min(cooldown, remaining > 0 ? remaining - 1 : 0));
       const cancel = this.#scheduler(delay, () => {
         room.botTimerCancels.delete(seat);
         void this.enqueue(room, () => {
@@ -747,6 +751,11 @@ function timeoutDiscardAction(hand: Extract<HandState, { phase: "awaiting-discar
     })[0];
   if (tile === undefined) throw new Error("Discard timeout has no concealed tile");
   return { decisionId: hand.decisionId, kind: "discard", tileId: tile.id };
+}
+
+function boundedBotDelay(delayMs: number): number {
+  if (!Number.isFinite(delayMs)) return 1_000;
+  return Math.max(1_000, Math.min(5_000, Math.floor(delayMs)));
 }
 
 function defaultScheduler(delayMs: number, callback: () => void): () => void {

@@ -68,6 +68,15 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
       "aria-label",
       /value/,
     );
+    const rackTiles = host.locator(".tile-rack .draggable-tile");
+    const beforeOrder = await rackTiles.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("data-tile-id")),
+    );
+    await rackTiles.first().dragTo(rackTiles.last());
+    const afterOrder = await rackTiles.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("data-tile-id")),
+    );
+    expect(afterOrder).not.toEqual(beforeOrder);
     const discard = host.getByRole("button", { name: "Discard selected" });
     await expect(discard).toBeDisabled();
     await host.locator(".tile-rack .tile-button").first().click();

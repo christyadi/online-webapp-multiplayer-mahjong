@@ -175,7 +175,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The active task is now explicitly updated to create the actual playable interface requested by the user: a real table view, visible local SVG tile art, hand selection/discard controls, claim/win/kong actions, server deadline display, reconnect/controller status, and hand results.
 - The table is responsive down to narrow mobile widths, uses 44px-or-larger controls, keeps opponent concealed tiles private, exposes a native keyboard-accessible help panel, and renders public discards/meld context plus the current wall count.
 - Added a Chromium end-to-end flow that starts a hand with bots, verifies 14 visible tile faces, selects a tile, enables the discard action, sends it through the live Socket.IO command path, and confirms the table remains synchronized.
-- Verification: formatting, strict typecheck, lint, production build, 77 Vitest tests, and all 5 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
+- Verification: formatting, strict typecheck, lint, production build, 78 Vitest tests, and all 5 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
 ## Milestone 7 feedback integrated
 
@@ -183,6 +183,9 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Reworked the felt into a four-sided board: East/South/West/North each have a positioned player card, while one central discard pool contains all public discards.
 - Expanded gameplay to full viewport width and height on desktop; mobile keeps a readable content-sized scroll layout. The browser regression now checks the table fills the viewport.
 - Rotated seat placement relative to the viewer so the viewer's player card and complete hand rack always occupy the lower side; side seats no longer constrain the hand to a narrow right column.
+- Added cryptographically random 1–5 second bot cooldowns, clamped and injectable for deterministic scheduler tests.
+- Player cards now show public exposed meld groups with tile faces and Pung/Chow/Kong labels; concealed opponent meld identities remain hidden.
+- Own tiles are draggable/reorderable in a full-width rack, with stable local ordering as authoritative snapshots add or remove tiles.
 - Added regression assertions for four seat cards, centralized discards, no per-player discard strips, and value-bearing tile labels.
 
 ## Next exact step

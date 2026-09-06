@@ -204,6 +204,35 @@ a {
   gap: 0.18rem;
   margin-top: 0.5rem;
 }
+.meld-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+.meld-group {
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 0.35rem;
+  padding: 0.2rem;
+  background: rgb(0 0 0 / 12%);
+}
+.meld-name {
+  display: block;
+  color: #f8e8bb;
+  font-size: 0.65rem;
+  font-weight: 750;
+  text-align: center;
+  text-transform: uppercase;
+}
+.meld-tiles {
+  display: flex;
+  gap: 0.12rem;
+}
+.meld-tiles .tile-art,
+.meld-tiles .tile-back {
+  width: 1.2rem;
+  height: 1.7rem;
+}
 .tile-back {
   display: block;
   width: 1.05rem;
@@ -284,6 +313,13 @@ a {
 }
 .hand-controls {
   min-width: 0;
+}
+.draggable-tile {
+  cursor: grab;
+  touch-action: pan-x;
+}
+.draggable-tile:active {
+  cursor: grabbing;
 }
 .tile-rack {
   display: flex;
