@@ -252,6 +252,14 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - WebKit passes all eight standard flows. Its isolated-guest multi-context test receives a documented 60-second allowance for the Windows WebKit engine and completed in 29 seconds; native drag is still asserted in Chromium, while WebKit verifies the keyboard/click interaction path.
 - Isolated Chromium flows pass for Chow claims, added-Kong upgrade, winning decomposition, opt-out/manual rematch, and default 15-second auto-rematch. Firefox was not installed or run, as requested.
 
+## UX review backlog (2026-09-06)
+
+- Player review found that the persistent **How to play** section is distracting; replace it with a question-mark icon that opens an accessible rules popover/bottom sheet on demand.
+- Player review found that **Hand starting · Mahjong table** adds no useful information during gameplay; remove the visible heading and retain only compact, actionable table context.
+- The table currently feels simultaneously too empty and too clustered. Future refinement should stabilize the felt footprint, reduce outer whitespace, strengthen the central discard/empty state, and add a discard-owner legend.
+- Future refinement should combine the local player card, hand, and legal actions into a bottom interaction dock, make active status legible through text plus high-contrast treatment and timer/progress, and keep end-of-hand reveals in an overlay or expandable panel.
+- The revised hierarchy must be checked at desktop, tablet, and both phone orientations without introducing page scroll during a normal turn. Firefox remains deferred at the user's direction.
+
 ## Next exact step
 
 The implementation and local verification are complete. Public deployment remains deliberately incomplete: connecting the private GitHub repository would grant Render OAuth access, and the Render Hobby account cannot guarantee a zero-spend hard cap because overage can be billable. Deployment requires the user's explicit decision on that OAuth access and overage policy; Firefox remains deferred.

@@ -42,3 +42,16 @@
 - [x] Run the integrated two-human/two-bot table flow at desktop Chromium, iPad Pro 11 Chromium, and Safari-engine sizes, including a live table reload/reconnect.
 - [x] Exercise the completed-hand rematch banner through a browser result flow before closing the cross-browser milestone.
 - [x] Exercise an in-browser Chow choice with its exact selector labels and confirm the exposed meld reaches both human players.
+
+## Future UX refinement backlog (captured 2026-09-06)
+
+These are planned follow-up improvements from the latest player review. They are intentionally unchecked and do not change the completed gameplay milestone.
+
+- [ ] Replace the persistent **How to play** disclosure with a circular question-mark icon button. Open the rules in a desktop popover or mobile bottom sheet, keep it closed by default, and provide an accessible name, keyboard focus handling, Escape-to-close, and a visible close action.
+- [ ] Remove the visible **Hand starting · Mahjong table** heading during gameplay. Retain a visually hidden semantic heading if needed, and move only useful context (room code, seat, connection, wall count, and turn timer) into a compact utility bar.
+- [ ] Rebalance the table composition so the felt has a stable aspect ratio and predictable footprint, uses less outer whitespace, and keeps the central discard pool visually dominant without stretching or collapsing between turns.
+- [ ] Add a clear central empty state (for example, **Waiting for the first discard**) and a compact legend explaining discard ownership colors so the middle never feels unexplained or empty.
+- [ ] Consolidate the local player card, hand rack, and legal actions into one bottom interaction dock. Keep the hand primary, show action buttons only when available, and reduce persistent drag/sort guidance to a compact affordance.
+- [ ] Improve player-card hierarchy with prominent text status, a strong active border/glow, and a timer/progress treatment. Color remains a secondary cue and is never the only way to identify the active player.
+- [ ] Keep end-of-hand opponent-hand inspection in an overlay or expandable panel so revealing hands does not resize the table or push the local hand and controls out of view.
+- [ ] Verify the revised hierarchy at 1440×900, iPad Pro 11, 390×844, and 844×390. The normal turn must fit without page scrolling; only intentionally long hand/discard collections may scroll inside their own regions.

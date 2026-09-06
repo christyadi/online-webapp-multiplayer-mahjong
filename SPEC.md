@@ -200,3 +200,15 @@ Set a goal to build, test, and publicly deploy the Mahjong Together web game des
 **Solution:** complete the three-agent final review and final read-only re-review, then deliver the live URL, dedicated branch and commit identifiers, pull-request URL if created, a short invite/play guide, the documented house rules, repository location, hosting configuration, startup/redeployment instructions, known limitations, and verification results. State that server restarts end in-memory games. Explain how to stop the service. Do not claim any checks passed unless they ran successfully.
 
 **Done when:** all prior milestones are verified and committed, the public game is usable, the documentation matches it, required checks pass, the final reviewers have no unresolved critical/high/medium findings, and there are no known failures in required gameplay or multiplayer behavior. Leave the dedicated branch unmerged and end the goal at this point; optional enhancements belong to a future task.
+
+## Future UX refinement backlog
+
+The following post-release improvements were captured from player feedback on September 6, 2026. They are future work, not additional acceptance criteria for the completed gameplay milestone:
+
+- Replace the always-visible **How to play** disclosure with a question-mark icon button that opens an accessible rules popover on desktop or bottom sheet on mobile. It must be closed by default, support keyboard focus, Escape, and an explicit close action.
+- Remove the visible **Hand starting · Mahjong table** gameplay heading. Keep a semantic heading for assistive technology if required, while presenting useful room, connection, wall, seat, and turn information in a compact utility bar.
+- Give the four-sided felt a stable aspect ratio and predictable footprint, reduce unused shell padding, and preserve a prominent central discard area with an explained empty state and discard-owner legend.
+- Group the local player card, hand rack, and legal actions into a bottom interaction dock. Keep the rack primary, reveal actions contextually, and reduce persistent instructional chrome.
+- Make active-player status unmistakable with text, high-contrast border/glow, and timer/progress treatment; never rely on seat color alone.
+- Present opponent-hand reveals in an overlay or expandable panel that preserves table geometry and keeps the local hand accessible.
+- Recheck hierarchy, reachability, and scroll behavior at desktop, tablet, and both required phone orientations, while retaining the existing 44×44 CSS-pixel control target and reduced-motion behavior.
