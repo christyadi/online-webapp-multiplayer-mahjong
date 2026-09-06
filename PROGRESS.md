@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 5 — Build the reliable multiplayer protocol.
+Milestone 6 — Add deterministic bots, deadlines, and disconnect recovery.
 
 ## Environment checks (2026-09-05)
 
@@ -157,6 +157,14 @@ Milestone 5 — Build the reliable multiplayer protocol.
 - The three-round milestone review cap was reached. The final correction was validated by a focused Chromium race that captures and delays the joined-room response, applies a newer null-room response, releases the stale response, and proves the join page and invite URL remain unchanged.
 - Final corrected verification: formatting, typecheck, lint, and production build pass; Vitest passes 11 files and 66 tests; Chromium Playwright passes all 5 tests. Firefox remains deferred at the user's direction.
 
+## Milestone 6 implementation
+
+- Added a deterministic information-limited bot policy: bots choose legal wins, pass non-winning claims, and discard by an explicit keep-score with stable type/physical-ID tie breaks.
+- Added per-room serialized deadline automation: 30-second discards, 10-second discard claims and added-kong robbery, absolute server deadlines, timeout discards, automatic passes, and stale timer guards.
+- Added disconnect takeover and reconnect cancellation for active human seats; disconnected humans remain the seat owner while a bot controls their actions. If every human disconnects, scheduled bots continue until hand completion.
+- Added deterministic bot-policy tests, a 100-seed all-bot transition simulation with physical-tile/phase invariants, deadline boundary tests, claim timeout coverage, reconnect cancellation, and all-human-disconnect completion coverage.
+- Verification after implementation: formatting, strict typecheck, lint, production build, 77 Vitest tests, and the default Chromium Playwright suite pass. Firefox remains deferred at the user's direction.
+
 ## Next exact step
 
-Create and push the Milestone 5 checkpoint, then implement deterministic bots, action timers, reconnect takeover, and simulation coverage for Milestone 6.
+Complete the independent Milestone 6 read-only review, correct any confirmed findings, checkpoint the bot/recovery work, then update the active task to Milestone 7 and build the real playable table UI with visible local SVG tiles and controls.

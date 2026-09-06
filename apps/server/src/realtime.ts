@@ -120,6 +120,9 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
       previous.emit("session:replaced");
       previous.disconnect(true);
     }
+    void options.roomStore.connect(session.guestId).catch(() => {
+      process.stderr.write("Room reconnect failed\n");
+    });
 
     const watchCurrentRoom = () => {
       const room = options.roomStore.getCurrent(session);
@@ -211,7 +214,9 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
         if (activeSockets.get(session.guestId)?.id !== socket.id) return;
         activeSockets.delete(session.guestId);
         options.sessionStore.releaseController(session.guestId, controllerId);
-        options.roomStore.disconnect(session.guestId);
+        void options.roomStore.disconnect(session.guestId).catch(() => {
+          process.stderr.write("Room disconnect failed\n");
+        });
       }, disconnectGraceMs);
       timer.unref();
       disconnectTimers.set(session.guestId, timer);

@@ -2,13 +2,22 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 
 import {
   gameSnapshotSchema,
+  tileTypeIndex,
   type CommandAcknowledgement,
   type GameCommand,
   type GameSnapshot,
   type RoomView,
 } from "@mahjong-together/shared";
 
-import { legalActionsForSeat, startHand, transition, type HandState } from "../game/state.js";
+import { chooseBotAction } from "../game/bot.js";
+import {
+  legalActionsForSeat,
+  startHand,
+  transition,
+  type HandAction,
+  type HandState,
+  type TransitionResult,
+} from "../game/state.js";
 import { createTileSet, shuffleTiles, type SeatIndex } from "../game/wall.js";
 import type { GuestSession } from "../identity/sessions.js";
 
@@ -28,10 +37,13 @@ type BotSeat = Readonly<{ kind: "bot" }>;
 type RoomSeat = HumanSeat | BotSeat | null;
 
 type Room = {
+  botTimerCancels: Map<SeatIndex, () => void>;
   code: string;
   commandCounts: Map<string, number>;
   commands: Map<string, Readonly<{ acknowledgement: CommandAcknowledgement; payloadHash: string }>>;
   createdAt: number;
+  deadline: number | null;
+  deadlineTimerCancel: (() => void) | null;
   hand: HandState | null;
   lastActivityAt: number;
   noConnectedHumansSince: number | null;
@@ -55,7 +67,10 @@ type RoomStoreOptions = Readonly<{
   codeFactory?: () => string;
   handFactory?: (dealer: SeatIndex) => HandState;
   maxRooms?: number;
+  scheduler?: RoomScheduler;
 }>;
+
+export type RoomScheduler = (delayMs: number, callback: () => void) => () => void;
 
 export class RoomStore {
   readonly #clock: () => number;
@@ -66,6 +81,7 @@ export class RoomStore {
   readonly #listeners = new Set<(code: string) => void>();
   readonly #maxRooms: number;
   readonly #rooms = new Map<string, Room>();
+  readonly #scheduler: RoomScheduler;
 
   constructor(options: RoomStoreOptions = {}) {
     this.#clock = options.clock ?? Date.now;
@@ -74,6 +90,7 @@ export class RoomStore {
       options.handFactory ??
       ((dealer) => startHand(randomUUID(), dealer, shuffleTiles(createTileSet())));
     this.#maxRooms = options.maxRooms ?? 20;
+    this.#scheduler = options.scheduler ?? defaultScheduler;
   }
 
   create(session: GuestSession, nickname: string): RoomView {
@@ -87,10 +104,13 @@ export class RoomStore {
     const code = this.createUniqueCode();
     const creator = this.createHumanSeat(session.guestId, nickname, true);
     const room: Room = {
+      botTimerCancels: new Map(),
       code,
       commandCounts: new Map(),
       commands: new Map(),
       createdAt: now,
+      deadline: null,
+      deadlineTimerCancel: null,
       hand: null,
       lastActivityAt: now,
       noConnectedHumansSince: null,
@@ -182,6 +202,7 @@ export class RoomStore {
     room.phase = "active";
     room.lastActivityAt = this.#clock();
     room.roomRevision += 1;
+    this.refreshAutomation(room, true);
     this.notify(code);
     return viewFor(room, session.guestId);
   }
@@ -195,31 +216,55 @@ export class RoomStore {
     this.ensureHost(room);
     this.updateConnectedState(room);
     room.roomRevision += 1;
+    this.refreshAutomation(room, false);
     this.notify(code);
   }
 
-  disconnect(guestId: string): void {
+  connect(guestId: string): Promise<void> {
+    const code = this.#guestRooms.get(guestId);
+    const room = code === undefined ? undefined : this.#rooms.get(code);
+    if (room?.phase !== "active") return Promise.resolve();
+    return this.enqueue(room, () => {
+      this.resolveExpiredDecision(room);
+      const seatIndex = findHumanSeat(room, guestId);
+      if (seatIndex === null) return;
+      const seat = room.seats[seatIndex];
+      if (seat?.kind !== "human" || seat.connected) return;
+      seat.connected = true;
+      room.noConnectedHumansSince = null;
+      room.lastActivityAt = this.#clock();
+      room.roomRevision += 1;
+      this.refreshAutomation(room, false);
+      this.notify(room.code);
+    });
+  }
+
+  disconnect(guestId: string): Promise<void> {
     this.cleanupExpired();
     const code = this.#guestRooms.get(guestId);
-    if (code === undefined) return;
+    if (code === undefined) return Promise.resolve();
     const room = this.#rooms.get(code);
-    if (room === undefined) return;
-    const seatIndex = findHumanSeat(room, guestId);
-    if (seatIndex === null) return;
-    const seat = room.seats[seatIndex];
-    if (seat?.kind !== "human") return;
+    if (room === undefined) return Promise.resolve();
+    return this.enqueue(room, () => {
+      const seatIndex = findHumanSeat(room, guestId);
+      if (seatIndex === null) return;
+      const seat = room.seats[seatIndex];
+      if (seat?.kind !== "human") return;
 
-    if (room.phase === "lobby") {
-      room.seats[seatIndex] = null;
-      this.#guestRooms.delete(guestId);
-      this.ensureHost(room);
-    } else {
-      seat.connected = false;
-    }
-    room.lastActivityAt = this.#clock();
-    this.updateConnectedState(room);
-    room.roomRevision += 1;
-    this.notify(code);
+      if (room.phase === "lobby") {
+        room.seats[seatIndex] = null;
+        this.#guestRooms.delete(guestId);
+        this.ensureHost(room);
+      } else {
+        this.resolveExpiredDecision(room);
+        seat.connected = false;
+      }
+      room.lastActivityAt = this.#clock();
+      this.updateConnectedState(room);
+      room.roomRevision += 1;
+      this.refreshAutomation(room, false);
+      this.notify(code);
+    });
   }
 
   cleanupExpired(): void {
@@ -314,6 +359,7 @@ export class RoomStore {
       };
     }
     room.commandCounts.set(session.guestId, commandCount + 1);
+    this.resolveExpiredDecision(room);
 
     let acknowledgement: CommandAcknowledgement;
     if (room.phase !== "active" || room.hand === null) {
@@ -326,21 +372,207 @@ export class RoomStore {
         decisionId: command.decisionId,
       });
       if (result.ok) {
-        room.hand = result.state;
-        room.roomRevision += 1;
-        room.lastActivityAt = this.#clock();
+        this.commitTransition(room, result);
         acknowledgement = {
           commandId: command.commandId,
           ok: true,
           roomRevision: room.roomRevision,
         };
-        this.notify(room.code);
       } else {
         acknowledgement = rejectedCommand(command, result.code, result.message, room);
       }
     }
     room.commands.set(cacheKey, { acknowledgement, payloadHash });
     return acknowledgement;
+  }
+
+  commitTransition(
+    room: Room,
+    result: Extract<TransitionResult, { ok: true }>,
+    deferAutomation = false,
+  ): void {
+    const previousDecision = room.hand?.phase === "hand-ended" ? null : room.hand?.decisionId;
+    room.hand = result.state;
+    room.roomRevision += 1;
+    room.lastActivityAt = this.#clock();
+    if (!deferAutomation) {
+      const nextDecision = result.state.phase === "hand-ended" ? null : result.state.decisionId;
+      this.refreshAutomation(room, previousDecision !== nextDecision);
+    }
+    this.notify(room.code);
+  }
+
+  resolveExpiredDecision(room: Room): void {
+    const hand = room.hand;
+    if (
+      hand === null ||
+      hand.phase === "hand-ended" ||
+      room.deadline === null ||
+      this.#clock() < room.deadline
+    ) {
+      return;
+    }
+
+    const expiredDecisionId = hand.decisionId;
+    this.cancelAutomation(room);
+    if (hand.phase === "awaiting-discard") {
+      const action = this.isBotControlled(room, hand.turn)
+        ? this.botAction(hand, hand.turn)
+        : timeoutDiscardAction(hand);
+      if (action === null) throw new Error("Expired discard decision has no legal action");
+      const result = transition(hand, hand.turn, action);
+      if (!result.ok) throw new Error(`Expired discard transition failed: ${result.code}`);
+      this.commitTransition(room, result);
+      return;
+    }
+
+    const unanswered =
+      hand.phase === "awaiting-discard-claims"
+        ? hand.eligible
+            .filter(({ seat }) => hand.responses[seat] === undefined)
+            .map(({ seat }) => seat)
+        : hand.eligible.filter((seat) => hand.responses[seat] === undefined);
+    for (const seat of unanswered) {
+      const current = room.hand;
+      if (
+        current === null ||
+        current.phase === "hand-ended" ||
+        current.decisionId !== expiredDecisionId
+      ) {
+        break;
+      }
+      const action: HandAction =
+        current.phase === "awaiting-discard-claims"
+          ? {
+              choice: { kind: "pass" },
+              decisionId: current.decisionId,
+              kind: "respond-to-discard",
+            }
+          : {
+              choice: "pass",
+              decisionId: current.decisionId,
+              kind: "respond-to-kong-robbery",
+            };
+      const result = transition(current, seat, action);
+      if (!result.ok) throw new Error(`Expired claim transition failed: ${result.code}`);
+      this.commitTransition(room, result, true);
+    }
+    const current = room.hand;
+    this.refreshAutomation(
+      room,
+      current === null ||
+        current.phase === "hand-ended" ||
+        current.decisionId !== expiredDecisionId,
+    );
+  }
+
+  refreshAutomation(room: Room, resetDeadline: boolean): void {
+    const hand = room.hand;
+    if (hand === null || hand.phase === "hand-ended") {
+      this.cancelAutomation(room);
+      return;
+    }
+    if (resetDeadline || room.deadline === null) {
+      this.cancelAutomation(room);
+      room.deadline = this.#clock() + (hand.phase === "awaiting-discard" ? 30_000 : 10_000);
+      const capturedHandId = hand.handId;
+      const capturedDecisionId = hand.decisionId;
+      room.deadlineTimerCancel = this.#scheduler(Math.max(0, room.deadline - this.#clock()), () => {
+        room.deadlineTimerCancel = null;
+        void this.enqueue(room, () => {
+          const current = room.hand;
+          if (
+            this.#rooms.get(room.code) !== room ||
+            current === null ||
+            current.phase === "hand-ended" ||
+            current.handId !== capturedHandId ||
+            current.decisionId !== capturedDecisionId
+          ) {
+            return;
+          }
+          this.resolveExpiredDecision(room);
+        });
+      });
+    }
+    this.reconcileBotTimers(room);
+  }
+
+  reconcileBotTimers(room: Room): void {
+    const hand = room.hand;
+    if (hand === null || hand.phase === "hand-ended" || room.deadline === null) return;
+    for (const [seat, cancel] of room.botTimerCancels) {
+      if (this.isBotControlled(room, seat) && legalActionsForSeat(hand, seat).kind !== "none") {
+        continue;
+      }
+      cancel();
+      room.botTimerCancels.delete(seat);
+    }
+    for (const seat of [0, 1, 2, 3] as const) {
+      if (
+        room.botTimerCancels.has(seat) ||
+        !this.isBotControlled(room, seat) ||
+        legalActionsForSeat(hand, seat).kind === "none"
+      ) {
+        continue;
+      }
+      const capturedHandId = hand.handId;
+      const capturedDecisionId = hand.decisionId;
+      const remaining = room.deadline - this.#clock();
+      const delay = Math.max(0, Math.min(700, remaining > 0 ? remaining - 1 : 0));
+      const cancel = this.#scheduler(delay, () => {
+        room.botTimerCancels.delete(seat);
+        void this.enqueue(room, () => {
+          const current = room.hand;
+          if (
+            this.#rooms.get(room.code) !== room ||
+            current === null ||
+            current.phase === "hand-ended" ||
+            current.handId !== capturedHandId ||
+            current.decisionId !== capturedDecisionId
+          ) {
+            return;
+          }
+          this.resolveExpiredDecision(room);
+          const afterExpiry = room.hand;
+          if (
+            afterExpiry === null ||
+            afterExpiry.phase === "hand-ended" ||
+            afterExpiry.decisionId !== capturedDecisionId ||
+            !this.isBotControlled(room, seat)
+          ) {
+            return;
+          }
+          const action = this.botAction(afterExpiry, seat);
+          if (action === null) return;
+          const result = transition(afterExpiry, seat, action);
+          if (!result.ok) throw new Error(`Bot transition failed: ${result.code}`);
+          this.commitTransition(room, result);
+        });
+      });
+      room.botTimerCancels.set(seat, cancel);
+    }
+  }
+
+  botAction(hand: HandState, seat: SeatIndex): HandAction | null {
+    return chooseBotAction({
+      concealedTiles: hand.players[seat].concealed,
+      decisionId: hand.phase === "hand-ended" ? "" : hand.decisionId,
+      legalActions: legalActionsForSeat(hand, seat),
+      seat,
+    });
+  }
+
+  isBotControlled(room: Room, seat: SeatIndex): boolean {
+    const occupant = room.seats[seat];
+    return occupant?.kind === "bot" || (occupant?.kind === "human" && !occupant.connected);
+  }
+
+  cancelAutomation(room: Room): void {
+    room.deadlineTimerCancel?.();
+    room.deadlineTimerCancel = null;
+    for (const cancel of room.botTimerCancels.values()) cancel();
+    room.botTimerCancels.clear();
+    room.deadline = null;
   }
 
   #assertCode(code: string): void {
@@ -376,6 +608,7 @@ export class RoomStore {
   }
 
   deleteRoom(room: Room): void {
+    this.cancelAutomation(room);
     this.#rooms.delete(room.code);
     for (const seat of room.seats) {
       if (seat?.kind === "human") this.#guestRooms.delete(seat.guestId);
@@ -447,7 +680,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
   // Runtime validation at this private-state/public-DTO boundary prevents an
   // accidental wall or opposing concealed hand from entering a socket payload.
   return gameSnapshotSchema.parse({
-    deadline: null,
+    deadline: room.deadline,
     decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
     handId: hand.handId,
     legalActions: legalActionsForSeat(hand, viewerSeat),
@@ -463,7 +696,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
         concealedCount: player.concealed.length,
         concealedTiles: revealAll || seat === viewerSeat ? player.concealed : null,
         connected: occupant.kind === "human" && occupant.connected,
-        controller: occupant.kind,
+        controller: occupant.kind === "bot" || !occupant.connected ? "bot" : "human",
         discards: player.discards,
         melds: player.melds.map((meld) => ({
           concealed: meld.concealed,
@@ -498,6 +731,28 @@ function requireConcealedTile(hand: HandState, seat: SeatIndex, tileId: string) 
 
 function hashCommand(command: GameCommand): string {
   return createHash("sha256").update(JSON.stringify(command)).digest("base64url");
+}
+
+function timeoutDiscardAction(hand: Extract<HandState, { phase: "awaiting-discard" }>): HandAction {
+  const concealed = hand.players[hand.turn].concealed;
+  const drawnTile =
+    hand.drawnTileId === undefined
+      ? undefined
+      : concealed.find((tile) => tile.id === hand.drawnTileId);
+  const tile =
+    drawnTile ??
+    [...concealed].sort((left, right) => {
+      const typeDifference = tileTypeIndex(right.type) - tileTypeIndex(left.type);
+      return typeDifference !== 0 ? typeDifference : right.id.localeCompare(left.id);
+    })[0];
+  if (tile === undefined) throw new Error("Discard timeout has no concealed tile");
+  return { decisionId: hand.decisionId, kind: "discard", tileId: tile.id };
+}
+
+function defaultScheduler(delayMs: number, callback: () => void): () => void {
+  const timer = setTimeout(callback, delayMs);
+  timer.unref();
+  return () => clearTimeout(timer);
 }
 
 function rejectedCommand(

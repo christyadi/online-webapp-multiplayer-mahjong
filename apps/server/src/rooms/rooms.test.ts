@@ -67,12 +67,12 @@ describe("room lobby", () => {
     expect(store.getCurrent(guest(1))).toBeNull();
   });
 
-  it("releases a disconnected lobby seat and transfers its host controls", () => {
+  it("releases a disconnected lobby seat and transfers its host controls", async () => {
     const store = new RoomStore({ codeFactory: () => "roomcode0004" });
     const room = store.create(guest(1), "First");
     store.join(guest(2), room.code, "Second");
 
-    store.disconnect(guest(1).guestId);
+    await store.disconnect(guest(1).guestId);
 
     expect(store.getCurrent(guest(1))).toBeNull();
     const second = store.getForGuest(guest(2), room.code);

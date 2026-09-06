@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { startHand, type AwaitingDiscardState, type PlayerHandState } from "../game/state.js";
 import { createTileSet, type SeatIndex } from "../game/wall.js";
 import type { GuestSession } from "../identity/sessions.js";
-import { RoomStore } from "./rooms.js";
+import { RoomStore, type RoomScheduler } from "./rooms.js";
 
 let uuidSequence = 0;
 
@@ -13,6 +13,148 @@ function guest(seat: SeatIndex): GuestSession {
 }
 
 describe("queued room gameplay", () => {
+  it.each([30_000, 30_001])(
+    "rejects a human discard dequeued at or after the %i ms deadline",
+    async (now) => {
+      const initial = startHand(uuid(), 0, createTileSet());
+      const time = new FakeTime();
+      const store = new RoomStore({
+        clock: () => time.now,
+        codeFactory: () => "timeoutcode1",
+        handFactory: () => structuredClone(initial),
+        scheduler: time.schedule,
+      });
+      const room = startRoom(store, 4);
+      const opening = store.getGameSnapshot(guest(0), room.code);
+      const drawnTileId = initial.drawnTileId;
+      time.now = now;
+
+      const late = await store.executeGameCommand(
+        guest(0),
+        gameCommand(opening, { kind: "discard", tileId: drawnTileId }),
+      );
+
+      expect(late).toMatchObject({ code: "stale-decision", ok: false });
+      const current = store.getGameSnapshot(guest(0), room.code);
+      expect(current.players[0].discards).toContainEqual(
+        expect.objectContaining({ id: drawnTileId }),
+      );
+      expect(current.deadline).toBeGreaterThan(now);
+    },
+  );
+
+  it("accepts a human action just before its deadline without resetting on rejection", async () => {
+    const initial = startHand(uuid(), 0, createTileSet());
+    const time = new FakeTime();
+    const store = new RoomStore({
+      clock: () => time.now,
+      codeFactory: () => "timeoutcode2",
+      handFactory: () => structuredClone(initial),
+      scheduler: time.schedule,
+    });
+    const room = startRoom(store, 4);
+    const opening = store.getGameSnapshot(guest(0), room.code);
+    time.now = 1_000;
+    const rejected = await store.executeGameCommand(
+      guest(1),
+      gameCommand(opening, { kind: "discard", tileId: initial.players[1].concealed[0].id }),
+    );
+    expect(rejected).toMatchObject({ code: "wrong-seat", ok: false });
+    expect(store.getGameSnapshot(guest(0), room.code).deadline).toBe(opening.deadline);
+
+    time.now = 29_999;
+    await expect(
+      store.executeGameCommand(
+        guest(0),
+        gameCommand(opening, { kind: "discard", tileId: initial.drawnTileId }),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("passes unanswered discard claims when the claim window expires", async () => {
+    const controlled = competingClaimState();
+    const time = new FakeTime();
+    const store = new RoomStore({
+      clock: () => time.now,
+      codeFactory: () => "claimtime001",
+      handFactory: () => structuredClone(controlled),
+      scheduler: time.schedule,
+    });
+    const room = startRoom(store, 4);
+    const opening = store.getGameSnapshot(guest(0), room.code);
+    const discard = controlled.players[0].concealed.find((tile) => tile.type === "d3");
+    if (discard === undefined) throw new Error("Missing opening discard");
+    await expect(
+      store.executeGameCommand(
+        guest(0),
+        gameCommand(opening, { kind: "discard", tileId: discard.id }),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+    const claims = store.getGameSnapshot(guest(1), room.code);
+    expect(claims.phase).toBe("awaiting-discard-claims");
+    const claimDecision = claims.decisionId;
+    await time.advanceTo(10_000);
+    const after = store.getGameSnapshot(guest(1), room.code);
+    expect(after.decisionId).not.toBe(claimDecision);
+    expect(after.phase).not.toBe("awaiting-discard-claims");
+  });
+
+  it("hands a disconnected turn to a bot and cancels it when the human returns", async () => {
+    const initial = startHand(uuid(), 0, createTileSet());
+    const time = new FakeTime();
+    const store = new RoomStore({
+      clock: () => time.now,
+      codeFactory: () => "takeovercode",
+      handFactory: () => structuredClone(initial),
+      scheduler: time.schedule,
+    });
+    const room = startRoom(store, 4);
+    const opening = store.getGameSnapshot(guest(0), room.code);
+
+    await store.disconnect(guest(0).guestId);
+    const disconnected = store.getGameSnapshot(guest(0), room.code);
+    expect(disconnected.deadline).toBe(opening.deadline);
+    expect(disconnected.players[0]).toMatchObject({ connected: false, controller: "bot" });
+    await store.connect(guest(0).guestId);
+    await time.advanceTo(700);
+
+    const reconnected = store.getGameSnapshot(guest(0), room.code);
+    expect(reconnected.decisionId).toBe(opening.decisionId);
+    expect(reconnected.players[0]).toMatchObject({ connected: true, controller: "human" });
+    expect(reconnected.players[0].discards).toHaveLength(0);
+
+    await store.disconnect(guest(0).guestId);
+    await time.advanceTo(1_400);
+    const takenOver = store.getGameSnapshot(guest(0), room.code);
+    expect(takenOver.decisionId).not.toBe(opening.decisionId);
+    expect(takenOver.players[0].discards).toHaveLength(1);
+    await store.connect(guest(0).guestId);
+    expect(store.getGameSnapshot(guest(0), room.code).players[0].controller).toBe("human");
+  });
+
+  it("finishes the hand through scheduled bots after the last human disconnects", async () => {
+    const time = new FakeTime();
+    const store = new RoomStore({
+      clock: () => time.now,
+      codeFactory: () => "allbotcode01",
+      handFactory: () => startHand(uuid(), 0, createTileSet()),
+      scheduler: time.schedule,
+    });
+    const room = startRoom(store, 2);
+    await store.disconnect(guest(0).guestId);
+    await store.disconnect(guest(1).guestId);
+
+    let scheduledActions = 0;
+    while (store.getGameSnapshot(guest(0), room.code).phase !== "hand-ended") {
+      if (scheduledActions >= 1_000 || !(await time.advanceNext())) {
+        throw new Error("All-bot room failed to finish within 1,000 scheduled actions");
+      }
+      scheduledActions += 1;
+    }
+
+    expect(scheduledActions).toBeLessThan(1_000);
+  });
+
   it("deduplicates commands, binds their payload, rejects wrong seats, and hides private tiles", async () => {
     const initial = startHand(uuid(), 0, createTileSet());
     const store = new RoomStore({
@@ -222,4 +364,60 @@ function competingClaimState(): AwaitingDiscardState {
 function uuid(): `${string}-${string}-${string}-${string}-${string}` {
   uuidSequence += 1;
   return `00000000-0000-4000-8000-${String(uuidSequence).padStart(12, "0")}`;
+}
+
+type FakeTask = {
+  active: boolean;
+  callback: () => void;
+  due: number;
+  sequence: number;
+};
+
+class FakeTime {
+  now = 0;
+  #sequence = 0;
+  readonly #tasks: FakeTask[] = [];
+
+  readonly schedule: RoomScheduler = (delayMs, callback) => {
+    const task = {
+      active: true,
+      callback,
+      due: this.now + delayMs,
+      sequence: (this.#sequence += 1),
+    };
+    this.#tasks.push(task);
+    return () => {
+      task.active = false;
+    };
+  };
+
+  async advanceTo(target: number): Promise<void> {
+    for (;;) {
+      const next = this.nextTask(target);
+      if (next === undefined) break;
+      this.now = next.due;
+      next.active = false;
+      next.callback();
+      await flushQueuedRoomWork();
+    }
+    this.now = target;
+    await flushQueuedRoomWork();
+  }
+
+  async advanceNext(): Promise<boolean> {
+    const next = this.nextTask(Number.POSITIVE_INFINITY);
+    if (next === undefined) return false;
+    await this.advanceTo(next.due);
+    return true;
+  }
+
+  private nextTask(maximumDue: number): FakeTask | undefined {
+    return this.#tasks
+      .filter((task) => task.active && task.due <= maximumDue)
+      .sort((left, right) => left.due - right.due || left.sequence - right.sequence)[0];
+  }
+}
+
+async function flushQueuedRoomWork(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
