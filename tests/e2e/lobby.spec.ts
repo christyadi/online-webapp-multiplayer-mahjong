@@ -53,6 +53,10 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await host.getByRole("button", { name: "Start hand" }).click();
 
     await expect(host.getByRole("heading", { name: "Hand starting" })).toBeVisible();
+    const viewport = host.viewportSize();
+    const tableBox = await host.locator(".table-shell").boundingBox();
+    expect(tableBox?.width).toBe(viewport?.width);
+    expect(tableBox?.height).toBeGreaterThanOrEqual((viewport?.height ?? 0) - 1);
     await expect(host.locator(".seat-detail", { hasText: "Bot" })).toHaveCount(2);
     await expect(host.locator(".table-seat")).toHaveCount(4);
     await expect(host.locator(".table-center .discard-pool")).toBeVisible();

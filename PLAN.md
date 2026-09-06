@@ -16,3 +16,4 @@
 - [x] Show each tile's name and value on hover (and retain the same label for keyboard/screen-reader access).
 - [x] Keep every player's discarded tiles in one central discard pool in the middle of the table; do not repeat them inside player cards.
 - [x] Present a four-sided table layout with one player card on each side, preserving a readable single-column mobile fallback.
+- [x] Make the gameplay table occupy the full viewport on desktop, with a content-sized mobile fallback.
