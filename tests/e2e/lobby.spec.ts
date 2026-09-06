@@ -118,7 +118,7 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
       await discard.evaluate((button: HTMLButtonElement) => button.click());
     } else await discard.click();
     await expect(host.locator(".table-felt")).toBeVisible();
-    await expect(host.getByText(/server revision/)).toBeVisible();
+    await expect(host.locator(".table-footer").getByText("Connected")).toBeVisible();
   } finally {
     await Promise.all(contexts.map(async (context) => context.close()));
   }

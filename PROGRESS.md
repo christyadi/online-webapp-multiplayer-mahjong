@@ -262,6 +262,12 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - New player feedback: add a restrained confetti or equivalent winner effect at hand completion, with a static fallback that does not obscure the result or controls.
 - The revised hierarchy must be checked at desktop, tablet, and both phone orientations without introducing page scroll during a normal turn. Firefox remains deferred at the user's direction.
 
+## Dark mode update (2026-09-06)
+
+- Added an accessible light/dark mode toggle that is available across landing, lobby, gameplay, results, and recovery screens.
+- The selected theme is stored locally; first use falls back to the operating-system dark-mode preference. CSS tokens cover page surfaces, table felt, cards, forms, controls, status states, and focus outlines while preserving readable tile faces.
+- Verification: formatting, lint, strict typecheck, production build, and Chromium/WebKit/tablet/phone home-screen smoke flows pass, including toggle persistence after reload. Firefox remains deferred at the user's direction.
+
 ## Next exact step
 
 The implementation and local verification are complete. Public deployment remains deliberately incomplete: connecting the private GitHub repository would grant Render OAuth access, and the Render Hobby account cannot guarantee a zero-spend hard cap because overage can be billable. Deployment requires the user's explicit decision on that OAuth access and overage policy; Firefox remains deferred.

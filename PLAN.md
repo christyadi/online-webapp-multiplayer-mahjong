@@ -42,6 +42,7 @@
 - [x] Run the integrated two-human/two-bot table flow at desktop Chromium, iPad Pro 11 Chromium, and Safari-engine sizes, including a live table reload/reconnect.
 - [x] Exercise the completed-hand rematch banner through a browser result flow before closing the cross-browser milestone.
 - [x] Exercise an in-browser Chow choice with its exact selector labels and confirm the exposed meld reaches both human players.
+- [x] Add a persisted light/dark theme toggle with system-preference fallback and readable contrast across landing, lobby, table, tiles, results, and status surfaces.
 
 ## Future UX refinement backlog (captured 2026-09-06)
 

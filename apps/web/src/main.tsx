@@ -22,6 +22,62 @@ import "./styles.css";
 import { TileArt } from "./tile-art.js";
 
 const OCCUPIED_ROOM_STORAGE_KEY = "mahjong-together:occupied-room";
+const THEME_STORAGE_KEY = "mahjong-together:theme";
+
+type Theme = "light" | "dark";
+
+function readThemePreference(): Theme {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // Continue with the system preference when storage is unavailable.
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function ThemeToggle({ theme, onToggle }: Readonly<{ onToggle: () => void; theme: Theme }>) {
+  const nextTheme = theme === "dark" ? "light" : "dark";
+  return (
+    <button
+      aria-label={`Switch to ${nextTheme} mode`}
+      aria-pressed={theme === "dark"}
+      className="theme-toggle"
+      onClick={onToggle}
+      title={`Switch to ${nextTheme} mode`}
+      type="button"
+    >
+      <span aria-hidden="true" className="theme-toggle-icon">
+        {theme === "dark" ? "☀" : "☾"}
+      </span>
+      <span>{theme === "dark" ? "Light" : "Dark"}</span>
+    </button>
+  );
+}
+
+function Root() {
+  const [theme, setTheme] = useState<Theme>(() => readThemePreference());
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // The theme still applies for this session when storage is unavailable.
+    }
+  }, [theme]);
+
+  return (
+    <>
+      <ThemeToggle
+        onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+        theme={theme}
+      />
+      <App />
+    </>
+  );
+}
 
 function App() {
   const { dispatch, state: serverState } = useServerState();
@@ -1472,7 +1528,7 @@ if (root === null) throw new Error("Missing application root");
 createRoot(root).render(
   <StrictMode>
     <ServerStateProvider>
-      <App />
+      <Root />
     </ServerStateProvider>
   </StrictMode>,
 );
