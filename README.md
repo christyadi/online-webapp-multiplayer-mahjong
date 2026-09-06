@@ -17,7 +17,10 @@ npm run lint
 npm test
 npm run test:e2e
 npm run test:e2e:claims
+npm run test:e2e:kongs
 npm run test:e2e:results
+npm run test:e2e:wins
+npm run test:e2e:phone
 npm run test:e2e:tablet
 npm run test:e2e:webkit
 npm run test:e2e:all
@@ -27,6 +30,6 @@ npm start
 
 Development serves Vite on `http://localhost:5173` and proxies API and Socket.IO traffic to the server on port 3001. Production uses one Express/Socket.IO process to serve the built site and multiplayer connections.
 
-`test:e2e` runs the desktop Chromium gate. `test:e2e:claims` runs a browser claim-choice scenario against an isolated test-only server factory. `test:e2e:results` runs the completed-hand/rematch browser scenario against another isolated test-only server factory. `test:e2e:tablet` runs the iPad Pro 11 viewport with Chromium, and `test:e2e:webkit` runs the Safari-engine gate. `test:e2e:all` includes Firefox too; Firefox is temporarily deferred at the user's direction.
+`test:e2e` runs the desktop Chromium gate. The isolated `claims`, `kongs`, `results`, and `wins` suites cover exact Chow choices, an added-Kong upgrade, rematch lifecycle, and the winning result presentation. `test:e2e:phone` uses the exact 390×844 and 844×390 Chromium viewports; `test:e2e:tablet` uses iPad Pro 11 Chromium; and `test:e2e:webkit` is the Safari-engine gate. `test:e2e:all` runs every standard and isolated suite, including Firefox, so it remains intentionally deferred at the user's direction.
 
 See [SPEC.md](./SPEC.md), [RULES.md](./RULES.md), and [DEPLOYMENT.md](./DEPLOYMENT.md).

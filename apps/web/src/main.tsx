@@ -21,17 +21,19 @@ import { ServerStateProvider, useServerState } from "./server-state.js";
 import "./styles.css";
 import { TileArt } from "./tile-art.js";
 
-const controllerId = crypto.randomUUID();
+const OCCUPIED_ROOM_STORAGE_KEY = "mahjong-together:occupied-room";
 
 function App() {
   const { dispatch, state: serverState } = useServerState();
   const { game, room } = serverState;
   const [error, setError] = useState<string | null>(null);
+  const [controllerId, setControllerId] = useState(() => crypto.randomUUID());
   const [loading, setLoading] = useState(true);
   const [path, setPath] = useState(window.location.pathname);
   const [pending, setPending] = useState(false);
   const [roomExpired, setRoomExpired] = useState(false);
-  const occupiedRoomCode = useRef<string | null>(null);
+  const [sessionReplaced, setSessionReplaced] = useState(false);
+  const occupiedRoomCode = useRef(readOccupiedRoomCode());
   const roomRequests = useRef(new LatestRequestGate());
   const realtime = useRef<Socket | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -47,6 +49,7 @@ function App() {
     (nextRoom: RoomView) => {
       roomRequests.current.invalidate();
       occupiedRoomCode.current = nextRoom.code;
+      persistOccupiedRoomCode(nextRoom.code);
       setRoomExpired(false);
       dispatch({ room: nextRoom, type: "room-received" });
       realtime.current?.emit("room:watch", () => undefined);
@@ -57,19 +60,41 @@ function App() {
   const expireRoom = useCallback(() => {
     roomRequests.current.invalidate();
     occupiedRoomCode.current = null;
+    clearOccupiedRoomCode();
     dispatch({ type: "room-cleared" });
     setRoomExpired(true);
     window.history.replaceState({}, "", "/");
     setPath("/");
   }, [dispatch]);
 
+  const recoverFromRestart = useCallback(() => {
+    realtime.current?.disconnect();
+    expireRoom();
+    setError(null);
+    setLoading(true);
+    setSessionReady(false);
+    setControllerId(crypto.randomUUID());
+  }, [expireRoom]);
+
   const refreshRoom = useCallback(async () => {
     const requestGeneration = roomRequests.current.begin();
-    const current = await requestJson("/api/rooms/current", currentRoomResponseSchema);
+    const current = await requestJson(
+      "/api/rooms/current",
+      currentRoomResponseSchema,
+      controllerId,
+    );
     if (!roomRequests.current.isCurrent(requestGeneration)) return;
     if (current.room === null) {
-      if (occupiedRoomCode.current !== null) expireRoom();
-      else dispatch({ type: "room-cleared" });
+      const inviteCode = inviteCodeFromPath(window.location.pathname);
+      if (occupiedRoomCode.current !== null && occupiedRoomCode.current === inviteCode) {
+        expireRoom();
+      } else {
+        if (occupiedRoomCode.current !== null) {
+          occupiedRoomCode.current = null;
+          clearOccupiedRoomCode();
+        }
+        dispatch({ type: "room-cleared" });
+      }
       return;
     }
     acceptRoom(current.room);
@@ -77,12 +102,12 @@ function App() {
       window.history.replaceState({}, "", `/room/${current.room.code}`);
       setPath(`/room/${current.room.code}`);
     }
-  }, [acceptRoom, dispatch, expireRoom]);
+  }, [acceptRoom, controllerId, dispatch, expireRoom]);
 
   useEffect(() => {
     const initialize = async () => {
       try {
-        await requestJson("/api/session", undefined, { method: "POST" });
+        await requestJson("/api/session", undefined, controllerId, { method: "POST" });
         setSessionReady(true);
         await refreshRoom();
       } catch (caught) {
@@ -92,7 +117,7 @@ function App() {
       }
     };
     void initialize();
-  }, [refreshRoom]);
+  }, [controllerId, refreshRoom]);
 
   useEffect(() => {
     if (!sessionReady) return;
@@ -106,13 +131,27 @@ function App() {
     socket.on("connect", () => {
       setSocket(socket);
       setRealtimeReady(true);
+      setSessionReplaced(false);
       setError(null);
     });
     socket.on("disconnect", () => {
       setRealtimeReady(false);
       setSocket((current) => (current === socket ? null : current));
     });
-    socket.on("connect_error", (caught) => setError(errorMessage(caught)));
+    socket.on("connect_error", (caught) => {
+      if (caught instanceof Error && caught.message === "session-required") {
+        recoverFromRestart();
+        return;
+      }
+      if (caught instanceof Error && caught.message === "controller-replaced") {
+        socket.disconnect();
+        setSessionReplaced(true);
+        setRealtimeReady(false);
+        setError("This room is controlled from another tab.");
+        return;
+      }
+      setError(errorMessage(caught));
+    });
     socket.on("room:changed", () => {
       void refreshRoom().catch((caught: unknown) => setError(errorMessage(caught)));
     });
@@ -122,7 +161,9 @@ function App() {
       dispatch({ snapshot: snapshot.data, type: "game-received" });
     });
     socket.on("session:replaced", () => {
-      setError("This room is now controlled from another tab. Reload to take control here.");
+      socket.disconnect();
+      setSessionReplaced(true);
+      setError("This room is now controlled from another tab.");
       setRealtimeReady(false);
     });
     socket.connect();
@@ -131,7 +172,13 @@ function App() {
       setSocket((current) => (current === socket ? null : current));
       socket.disconnect();
     };
-  }, [dispatch, refreshRoom, sessionReady]);
+  }, [controllerId, dispatch, recoverFromRestart, refreshRoom, sessionReady]);
+
+  const takeControl = useCallback(() => {
+    setControllerId(crypto.randomUUID());
+    setError(null);
+    setSessionReplaced(false);
+  }, []);
 
   useEffect(() => {
     const handleNavigation = () => setPath(window.location.pathname);
@@ -162,7 +209,14 @@ function App() {
     return (
       <StatusCard
         title={error === null ? "Connecting to the table…" : "Table control unavailable"}
-        message={error ?? "Establishing the secure live connection."}
+        message={
+          sessionReplaced
+            ? "This room is controlled from another tab. Take control only if you mean to move play here."
+            : (error ?? "Establishing the secure live connection.")
+        }
+        {...(sessionReplaced
+          ? { action: { label: "Take control here", onClick: takeControl } }
+          : {})}
       />
     );
   }
@@ -185,12 +239,14 @@ function App() {
   if (room !== null) {
     return (
       <Lobby
+        controllerId={controllerId}
         error={error}
         onError={setError}
         onExpired={expireRoom}
         onLeave={() => {
           roomRequests.current.invalidate();
           occupiedRoomCode.current = null;
+          clearOccupiedRoomCode();
           dispatch({ type: "room-cleared" });
           setRoomExpired(false);
           navigate("/");
@@ -211,6 +267,7 @@ function App() {
     return (
       <JoinRoom
         code={inviteCode}
+        controllerId={controllerId}
         error={error}
         onJoined={refreshRoom}
         onMutationStart={() => roomRequests.current.invalidate()}
@@ -236,11 +293,16 @@ function App() {
             setPending(true);
             setError(null);
             try {
-              const created = await requestJson("/api/rooms", lobbyMutationAcknowledgementSchema, {
-                body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
-                headers: { "content-type": "application/json" },
-                method: "POST",
-              });
+              const created = await requestJson(
+                "/api/rooms",
+                lobbyMutationAcknowledgementSchema,
+                controllerId,
+                {
+                  body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
+                  headers: { "content-type": "application/json" },
+                  method: "POST",
+                },
+              );
               navigate(`/room/${created.roomCode}`);
               await refreshRoom();
             } catch (caught) {
@@ -258,6 +320,7 @@ function App() {
 
 type JoinRoomProperties = Readonly<{
   code: string;
+  controllerId: string;
   error: string | null;
   onJoined: () => Promise<void>;
   onMutationStart: () => void;
@@ -268,6 +331,7 @@ type JoinRoomProperties = Readonly<{
 
 function JoinRoom({
   code,
+  controllerId,
   error,
   onJoined,
   onMutationStart,
@@ -295,11 +359,16 @@ function JoinRoom({
                 setPending(true);
                 setError(null);
                 try {
-                  await requestJson(`/api/rooms/${code}/join`, lobbyMutationAcknowledgementSchema, {
-                    body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
-                    headers: { "content-type": "application/json" },
-                    method: "POST",
-                  });
+                  await requestJson(
+                    `/api/rooms/${code}/join`,
+                    lobbyMutationAcknowledgementSchema,
+                    controllerId,
+                    {
+                      body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
+                      headers: { "content-type": "application/json" },
+                      method: "POST",
+                    },
+                  );
                   await onJoined();
                 } catch (caught) {
                   setError(errorMessage(caught));
@@ -358,6 +427,7 @@ function NicknameForm({ buttonLabel, disabled, error, onSubmit }: NicknameFormPr
 }
 
 type LobbyProperties = Readonly<{
+  controllerId: string;
   error: string | null;
   game: GameSnapshot | null;
   onError: (message: string | null) => void;
@@ -372,6 +442,7 @@ type LobbyProperties = Readonly<{
 }>;
 
 function Lobby({
+  controllerId,
   error,
   game,
   onError,
@@ -398,7 +469,7 @@ function Lobby({
     setPending(true);
     onError(null);
     try {
-      await requestJson(path, lobbyMutationAcknowledgementSchema, {
+      await requestJson(path, lobbyMutationAcknowledgementSchema, controllerId, {
         body: JSON.stringify({ commandId: crypto.randomUUID(), ...body }),
         headers: { "content-type": "application/json" },
         method: "POST",
@@ -420,7 +491,7 @@ function Lobby({
     leaveInFlight.current = true;
     onInvalidateRoomRequests();
     setPending(true);
-    void requestJson(`/api/rooms/${room.code}/leave`, undefined, {
+    void requestJson(`/api/rooms/${room.code}/leave`, undefined, controllerId, {
       body: JSON.stringify({ commandId: crypto.randomUUID() }),
       headers: { "content-type": "application/json" },
       method: "POST",
@@ -557,12 +628,25 @@ function Lobby({
   );
 }
 
-function StatusCard({ title, message }: Readonly<{ message: string; title: string }>) {
+function StatusCard({
+  action,
+  title,
+  message,
+}: Readonly<{
+  action?: Readonly<{ label: string; onClick: () => void }>;
+  message: string;
+  title: string;
+}>) {
   return (
     <main>
       <section className="welcome-card" aria-live="polite">
         <h1>{title}</h1>
         <p>{message}</p>
+        {action === undefined ? null : (
+          <button onClick={action.onClick} type="button">
+            {action.label}
+          </button>
+        )}
       </section>
     </main>
   );
@@ -817,10 +901,21 @@ function Table({
         )}
         <details className="help-panel">
           <summary>How to play</summary>
-          <p>
-            Choose a tile, then discard it. When another player discards, claim with win, pung,
-            kong, chow, or pass. A green status means the server is in control of the hand.
-          </p>
+          <ul>
+            <li>When your card says Playing, choose one tile and select Discard selected.</li>
+            <li>
+              On another player&apos;s discard, choose Pass, Win, Pung, Kong, or Chow when that
+              action is available. Only the next seat may Chow.
+            </li>
+            <li>
+              Win with four sets and a pair, or seven distinct pairs. The table resolves competing
+              claims by win, then kong or pung, then chow.
+            </li>
+            <li>
+              The server shows the remaining time for each turn. A disconnected human seat is
+              temporarily played by a bot and returns to human control when it reconnects.
+            </li>
+          </ul>
         </details>
         {error === null ? null : (
           <p className="error" role="alert">
@@ -863,7 +958,10 @@ function PlayerPanel({
     >
       <div className="player-heading">
         <strong>{player.nickname ?? `Bot ${seatName(player.seat)}`}</strong>
-        <span>{seatName(player.seat)}</span>
+        <span>
+          {seatName(player.seat)}
+          {player.seat === game.dealer ? " · Dealer" : ""}
+        </span>
       </div>
       <small className="seat-detail">
         {player.connected ? "Connected" : "Reconnecting"} ·{" "}
@@ -1028,6 +1126,29 @@ function ActionBar({
             Kong {tileType}
           </button>
         ))}
+        {legal.addedKongs.map((addedKong) => {
+          const tile = game.players
+            .find((player) => player.seat === game.viewerSeat)
+            ?.concealedTiles?.find((candidate) => candidate.id === addedKong.tileId);
+          const tileName = tile === undefined ? "tile" : tileTypeName(tile.type);
+          return (
+            <button
+              className="secondary"
+              disabled={disabled}
+              key={`${String(addedKong.meldIndex)}-${addedKong.tileId}`}
+              onClick={() =>
+                onAction({
+                  kind: "propose-added-kong",
+                  meldIndex: addedKong.meldIndex,
+                  tileId: addedKong.tileId,
+                })
+              }
+              type="button"
+            >
+              Upgrade Pung to Kong with {tileName}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -1160,6 +1281,7 @@ function ResultBanner({
             ? "The wall is empty."
             : `Win by ${result.source.replaceAll("-", " ")}.`}
         </span>
+        {result.kind === "win" ? <WinningCombination decomposition={result.decomposition} /> : null}
       </div>
       <label className="auto-play-option">
         <input
@@ -1191,6 +1313,51 @@ function ResultBanner({
       <button className="secondary" onClick={onToggleOpponentTiles} type="button">
         {showOpponentTiles ? "Hide other hands" : "Show other hands"}
       </button>
+    </div>
+  );
+}
+
+function WinningCombination({
+  decomposition,
+}: Readonly<{
+  decomposition: Exclude<NonNullable<GameSnapshot["result"]>, { kind: "draw" }>["decomposition"];
+}>) {
+  if (decomposition.kind === "seven-pairs") {
+    return (
+      <div aria-label="Winning combination" className="winning-combination">
+        <strong>Winning combination · Seven pairs</strong>
+        <div className="winning-groups">
+          {decomposition.pairs.map((pair, index) => (
+            <div className="winning-group" key={`pair-${String(index)}`}>
+              <span>Pair</span>
+              {pair.map((tile) => (
+                <TileArt key={tile.id} tile={tile} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div aria-label="Winning combination" className="winning-combination">
+      <strong>Winning combination</strong>
+      <div className="winning-groups">
+        <div className="winning-group">
+          <span>Pair</span>
+          {decomposition.pair.map((tile) => (
+            <TileArt key={tile.id} tile={tile} />
+          ))}
+        </div>
+        {decomposition.sets.map((set, index) => (
+          <div className="winning-group" key={`set-${String(index)}`}>
+            <span>{set.kind}</span>
+            {set.tiles.map((tile) => (
+              <TileArt key={tile.id} tile={tile} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1235,6 +1402,7 @@ function moveTile(
 async function requestJson<T>(
   path: string,
   schema: Readonly<{ parse: (input: unknown) => T }> | undefined,
+  controllerId: string,
   init: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(init.headers);
@@ -1248,6 +1416,33 @@ async function requestJson<T>(
       : new Error("The server could not complete the request");
   }
   return schema === undefined ? (body as T) : schema.parse(body);
+}
+
+function readOccupiedRoomCode(): string | null {
+  try {
+    const parsed = roomCodeSchema.safeParse(
+      window.sessionStorage.getItem(OCCUPIED_ROOM_STORAGE_KEY),
+    );
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistOccupiedRoomCode(code: string): void {
+  try {
+    window.sessionStorage.setItem(OCCUPIED_ROOM_STORAGE_KEY, code);
+  } catch {
+    // Private browsing can disable storage; in-memory recovery still works in the current tab.
+  }
+}
+
+function clearOccupiedRoomCode(): void {
+  try {
+    window.sessionStorage.removeItem(OCCUPIED_ROOM_STORAGE_KEY);
+  } catch {
+    // Clearing an unavailable optional recovery marker is intentionally best effort.
+  }
 }
 
 function inviteCodeFromPath(path: string): string | null {

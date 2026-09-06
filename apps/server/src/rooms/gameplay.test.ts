@@ -108,6 +108,89 @@ describe("queued room gameplay", () => {
     expect(after.phase).not.toBe("awaiting-discard-claims");
   });
 
+  it("restores a human without changing an open discard-claim decision", async () => {
+    const controlled = competingClaimState();
+    const time = new FakeTime();
+    const store = new RoomStore({
+      botDelayMs: () => 1_000,
+      clock: () => time.now,
+      codeFactory: () => "claimreturn1",
+      handFactory: () => structuredClone(controlled),
+      scheduler: time.schedule,
+    });
+    const room = startRoom(store, 4);
+    const opening = store.getGameSnapshot(guest(0), room.code);
+    const discard = controlled.players[0].concealed.find((tile) => tile.type === "d3");
+    if (discard === undefined) throw new Error("Missing opening discard");
+    await store.executeGameCommand(
+      guest(0),
+      gameCommand(opening, { kind: "discard", tileId: discard.id }),
+    );
+
+    const claims = store.getGameSnapshot(guest(1), room.code);
+    expect(claims.phase).toBe("awaiting-discard-claims");
+    const deadline = claims.deadline;
+    await store.disconnect(guest(1).guestId);
+    expect(store.getGameSnapshot(guest(1), room.code).players[1]).toMatchObject({
+      connected: false,
+      controller: "bot",
+    });
+
+    await store.connect(guest(1).guestId);
+    const restored = store.getGameSnapshot(guest(1), room.code);
+    expect(restored).toMatchObject({
+      decisionId: claims.decisionId,
+      deadline,
+      phase: "awaiting-discard-claims",
+    });
+    expect(restored.players[1]).toMatchObject({ connected: true, controller: "human" });
+    expect(restored.legalActions.kind).toBe("discard-claim");
+  });
+
+  it("restores a human without changing an open added-kong robbery decision", async () => {
+    const controlled = addedKongRobberyState();
+    const time = new FakeTime();
+    const store = new RoomStore({
+      botDelayMs: () => 1_000,
+      clock: () => time.now,
+      codeFactory: () => "kongreturn01",
+      handFactory: () => structuredClone(controlled),
+      scheduler: time.schedule,
+    });
+    const room = startRoom(store, 2);
+    const opening = store.getGameSnapshot(guest(0), room.code);
+    const pungIndex = controlled.players[0].melds.findIndex((meld) => meld.kind === "pung");
+    const upgrade = controlled.players[0].concealed.find((tile) => tile.type === "d3");
+    if (pungIndex === -1 || upgrade === undefined) throw new Error("Missing added-kong fixture");
+    await store.executeGameCommand(
+      guest(0),
+      gameCommand(opening, {
+        kind: "propose-added-kong",
+        meldIndex: pungIndex,
+        tileId: upgrade.id,
+      }),
+    );
+
+    const robbery = store.getGameSnapshot(guest(1), room.code);
+    expect(robbery.phase).toBe("awaiting-kong-robbery");
+    const deadline = robbery.deadline;
+    await store.disconnect(guest(1).guestId);
+    expect(store.getGameSnapshot(guest(1), room.code).players[1]).toMatchObject({
+      connected: false,
+      controller: "bot",
+    });
+
+    await store.connect(guest(1).guestId);
+    const restored = store.getGameSnapshot(guest(1), room.code);
+    expect(restored).toMatchObject({
+      decisionId: robbery.decisionId,
+      deadline,
+      phase: "awaiting-kong-robbery",
+    });
+    expect(restored.players[1]).toMatchObject({ connected: true, controller: "human" });
+    expect(restored.legalActions).toEqual({ kind: "kong-robbery" });
+  });
+
   it("hands a disconnected turn to a bot and cancels it when the human returns", async () => {
     const initial = startHand(uuid(), 0, createTileSet());
     const time = new FakeTime();
@@ -409,6 +492,59 @@ function competingClaimState(): AwaitingDiscardState {
   function player(types: readonly TileType[]): PlayerHandState {
     return { concealed: types.map(take), discards: [], melds: [] };
   }
+}
+
+function addedKongRobberyState(): AwaitingDiscardState {
+  const pool = createTileSet();
+  const take = (type: TileType): PhysicalTile => {
+    const index = pool.findIndex((tile) => tile.type === type);
+    if (index === -1) throw new Error(`Missing ${type}`);
+    const tile = pool.splice(index, 1)[0];
+    return tile;
+  };
+  const player = (types: readonly TileType[]): PlayerHandState => ({
+    concealed: types.map(take),
+    discards: [],
+    melds: [],
+  });
+  const pungTiles = [take("d3"), take("d3"), take("d3")] as [
+    PhysicalTile,
+    PhysicalTile,
+    PhysicalTile,
+  ];
+  const players: [PlayerHandState, PlayerHandState, PlayerHandState, PlayerHandState] = [
+    {
+      concealed: [take("d3")],
+      discards: [],
+      melds: [{ concealed: false, kind: "pung", tiles: pungTiles }],
+    },
+    player(["d1", "d2", "b1", "b2", "b3", "c1", "c2", "c3", "east", "east", "east", "red", "red"]),
+    player([]),
+    player([]),
+  ];
+  for (const [seat, current] of players.entries()) {
+    const concealedTarget = seat === 0 ? 11 : 13;
+    while (current.concealed.length < concealedTarget) {
+      const tile = pool.shift();
+      if (tile === undefined) throw new Error("Tile pool exhausted");
+      current.concealed.push(tile);
+    }
+  }
+  const handId = uuid();
+  const drawnTile = players[0].concealed.at(-1);
+  if (drawnTile === undefined) throw new Error("Missing added-kong turn tile");
+  return {
+    dealer: 0,
+    decisionId: `${handId}:1`,
+    decisionSequence: 1,
+    drawnTileId: drawnTile.id,
+    handId,
+    phase: "awaiting-discard",
+    players,
+    turn: 0,
+    turnOrigin: "draw",
+    wall: pool,
+  };
 }
 
 function uuid(): `${string}-${string}-${string}-${string}-${string}` {

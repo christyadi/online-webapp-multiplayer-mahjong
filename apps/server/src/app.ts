@@ -36,7 +36,7 @@ export type AppOptions = Readonly<{
 
 export function createApp(options: AppOptions = {}) {
   const app = express();
-  const appOrigin = options.appOrigin ?? process.env.APP_ORIGIN;
+  const appOrigin = resolveAppOrigin(options.appOrigin ?? process.env.APP_ORIGIN);
   const roomStore = options.roomStore ?? new RoomStore();
   const secureCookies = options.secureCookies ?? appOrigin?.startsWith("https://") === true;
   const sessionStore = options.sessionStore ?? new SessionStore();
@@ -278,6 +278,30 @@ export function createApp(options: AppOptions = {}) {
   );
 
   return app;
+}
+
+export function resolveAppOrigin(value: string | undefined): string | undefined {
+  if (value === undefined || value.trim() === "") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("APP_ORIGIN must be set before starting Mahjong Together in production");
+    }
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("APP_ORIGIN must be an absolute URL");
+  }
+  const localHttp =
+    parsed.protocol === "http:" &&
+    (parsed.hostname === "127.0.0.1" ||
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "::1");
+  if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:" && !localHttp) {
+    throw new Error("APP_ORIGIN must use HTTPS in production");
+  }
+  return parsed.origin;
 }
 
 function readGuestToken(request: Request): string | undefined {

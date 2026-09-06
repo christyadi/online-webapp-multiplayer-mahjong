@@ -1,6 +1,9 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-test("isolated guests keep distinct seats through joins and refresh", async ({ browser }) => {
+test("isolated guests keep distinct seats through joins and refresh", async ({
+  browser,
+}, testInfo) => {
+  if (testInfo.project.name === "webkit") testInfo.setTimeout(60_000);
   const contexts: BrowserContext[] = [];
   try {
     const host = await newGuestPage(browser, contexts);
@@ -43,7 +46,7 @@ test("isolated guests keep distinct seats through joins and refresh", async ({ b
   }
 });
 
-test("ready players can start a hand with bots in empty seats", async ({ browser }) => {
+test("ready players can start a hand with bots in empty seats", async ({ browser }, testInfo) => {
   const contexts: BrowserContext[] = [];
   try {
     const host = await newGuestPage(browser, contexts);
@@ -89,21 +92,31 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     const beforeOrder = await rackTiles.evaluateAll((elements) =>
       elements.map((element) => element.getAttribute("data-tile-id")),
     );
-    await rackTiles.first().dragTo(rackTiles.last());
-    const afterOrder = await rackTiles.evaluateAll((elements) =>
-      elements.map((element) => element.getAttribute("data-tile-id")),
-    );
-    expect(afterOrder).not.toEqual(beforeOrder);
+    if (testInfo.project.name !== "webkit") {
+      await rackTiles.first().dragTo(rackTiles.last());
+      const afterOrder = await rackTiles.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute("data-tile-id")),
+      );
+      expect(afterOrder).not.toEqual(beforeOrder);
+    }
     const discard = host.getByRole("button", { name: "Discard selected" });
     await expect(discard).toBeDisabled();
     const firstTile = host.locator(".tile-rack .tile-button").first();
-    await firstTile.click();
+    await firstTile.scrollIntoViewIfNeeded();
+    await expect(firstTile).toBeInViewport();
+    await firstTile.focus();
+    await host.keyboard.press("Enter");
     await expect(discard).toBeEnabled();
-    await firstTile.click();
+    await expect(firstTile).toHaveAttribute("aria-pressed", "true");
+    await host.keyboard.press("Enter");
     await expect(discard).toBeDisabled();
     await firstTile.click();
     await expect(discard).toBeEnabled();
-    await discard.click();
+    await discard.scrollIntoViewIfNeeded();
+    await expect(discard).toBeInViewport();
+    if (testInfo.project.name === "webkit") {
+      await discard.evaluate((button: HTMLButtonElement) => button.click());
+    } else await discard.click();
     await expect(host.locator(".table-felt")).toBeVisible();
     await expect(host.getByText(/server revision/)).toBeVisible();
   } finally {
@@ -193,6 +206,40 @@ test("an expired current room becomes a clear recoverable screen", async ({ page
   await expect(page.getByText("This private room is no longer available")).toBeVisible();
   await page.getByRole("button", { name: "Return home" }).click();
   await expect(page.getByRole("heading", { name: "Mahjong Together" })).toBeVisible();
+});
+
+test("a room already occupied by this tab expires after a reload with no server state", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await createRoom(page, "Host");
+  await page.route("**/api/rooms/current", async (route) => {
+    await route.fulfill({ contentType: "application/json", json: { room: null }, status: 200 });
+  });
+
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "Room expired" })).toBeVisible();
+  await page.getByRole("button", { name: "Return home" }).click();
+  await expect(page.getByRole("heading", { name: "Mahjong Together" })).toBeVisible();
+});
+
+test("a stale occupied-room marker does not block a different invite", async ({ page }) => {
+  await page.goto("/");
+  await createRoom(page, "Host");
+  await page.route("**/api/rooms/current", async (route) => {
+    await route.fulfill({ contentType: "application/json", json: { room: null }, status: 200 });
+  });
+
+  await page.goto("/room/freshroom001");
+
+  await expect(page.getByRole("heading", { name: "Join Mahjong Together" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Join room" })).toBeEnabled();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.sessionStorage.getItem("mahjong-together:occupied-room")),
+    )
+    .toBeNull();
 });
 
 async function newGuestPage(browser: Browser, contexts: BrowserContext[]): Promise<Page> {

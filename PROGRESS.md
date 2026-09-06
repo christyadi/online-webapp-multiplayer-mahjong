@@ -233,6 +233,25 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The required corrected re-review found no remaining critical, high, or medium issue. It confirmed that the fixture uses the real app, Socket.IO, HTTP routes, and built client while remaining unimported by production startup and exposing no test endpoint.
 - Verification: format, lint, strict typecheck, production build, and all 82 unit/integration tests pass. Default Chromium has 6 passing flows; iPad Pro 11 Chromium has 6; the Safari-engine active-table flow passes; the dedicated result suite has 2 passing Chromium flows; and the dedicated Chow-claim suite has 1 passing Chromium flow. Firefox remains intentionally deferred.
 
+## Milestone 9 stabilization and final-review corrections
+
+- Added the visible **Upgrade Pung to Kong** action for every legal added-Kong option, with a focused built-app Socket.IO browser flow. The test fixture deliberately gives no opponent a rob-the-Kong win, so it proves the resulting exposed four-tile Kong.
+- Result banners now identify the dealer and render the complete physical winning decomposition (pair plus all sets, or seven pairs), not merely the win source. The dedicated result fixture verifies the full presentation.
+- Dealer state is now part of the validated game snapshot. The dealer advances exactly once per finished hand and remains correct if the host returns to the lobby before starting the next hand.
+- Corrected active-room recovery: ordinary invite links stay on the join screen for a new guest, while a room the current guest had occupied is safely cleared after a server restart or expiry. A stale marker for a different invite is discarded rather than blocking that invite. A restart integration test verifies the new process has no stale room state.
+- Latest-tab control now has an explicit **Take control here** path. The old socket is disconnected and rejected on automatic reconnection once a newer tab takes control; the replacement keeps control. HTTP and Socket.IO coverage exercise the controller race.
+- Production startup now requires an explicit secure external `APP_ORIGIN`, ensuring cookie security and origin checks cannot silently be disabled by an incomplete deployment configuration.
+- Added reconnect regressions during an open discard-claim and an open added-Kong robbery decision. Reconnecting before the bot acts preserves the exact decision and deadline.
+- Moved the visual table to the required pale neutral surface while retaining distinctive, higher-contrast colored player cards. The full-size PC/tablet board and lower local hand remain unchanged.
+- Added exact 390×844 portrait and 844×390 landscape Chromium projects, including keyboard selection and reachable discard controls. The all-browser command includes the isolated claim, Kong, result, and winning-hand fixtures, but is intentionally not run while Firefox remains deferred.
+
+## Final verification after stabilization
+
+- `npm run format`, `npm run lint`, strict `npm run typecheck`, production `npm run build`, and `npm test` pass; Vitest reports 13 files and 89 tests.
+- Chromium desktop passes all eight standard page/lobby flows. Chromium phone portrait and landscape pass all sixteen standard flows across the exact required viewports. iPad Pro 11 Chromium passes all eight standard flows.
+- WebKit passes all eight standard flows. Its isolated-guest multi-context test receives a documented 60-second allowance for the Windows WebKit engine and completed in 29 seconds; native drag is still asserted in Chromium, while WebKit verifies the keyboard/click interaction path.
+- Isolated Chromium flows pass for Chow claims, added-Kong upgrade, winning decomposition, opt-out/manual rematch, and default 15-second auto-rematch. Firefox was not installed or run, as requested.
+
 ## Next exact step
 
-Deployment requires the user's explicit decision on GitHub OAuth access and accepting Render's included-usage overage policy; Firefox remains deferred.
+The implementation and local verification are complete. Public deployment remains deliberately incomplete: connecting the private GitHub repository would grant Render OAuth access, and the Render Hobby account cannot guarantee a zero-spend hard cap because overage can be billable. Deployment requires the user's explicit decision on that OAuth access and overage policy; Firefox remains deferred.

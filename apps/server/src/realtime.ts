@@ -38,10 +38,14 @@ type RealtimeOptions = Readonly<{
   sessionStore: SessionStore;
 }>;
 
+const MAX_CONTROLLERS_PER_GUEST = 64;
+
 export function configureRealtime(server: RealtimeServer, options: RealtimeOptions): () => void {
   const activeSockets = new Map<string, RealtimeSocket>();
   const commandTimes = new Map<string, number[]>();
   const disconnectTimers = new Map<string, NodeJS.Timeout>();
+  const knownControllers = new Map<string, Set<string>>();
+  const supersededControllers = new Map<string, Set<string>>();
   const socketControllers = new Map<string, string>();
   const socketSessions = new Map<string, GuestSession>();
   const disconnectGraceMs = options.disconnectGraceMs ?? 250;
@@ -74,6 +78,19 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
     );
     if (!controllerId.success) {
       next(new Error("controller-required"));
+      return;
+    }
+    const known = knownControllers.get(session.guestId);
+    if (supersededControllers.get(session.guestId)?.has(controllerId.data) === true) {
+      next(new Error("controller-replaced"));
+      return;
+    }
+    if (
+      known?.has(controllerId.data) !== true &&
+      known !== undefined &&
+      known.size >= MAX_CONTROLLERS_PER_GUEST
+    ) {
+      next(new Error("controller-limit"));
       return;
     }
     socketSessions.set(socket.id, session);
@@ -115,6 +132,16 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
 
     const previous = activeSockets.get(session.guestId);
     activeSockets.set(session.guestId, socket);
+    const known = knownControllers.get(session.guestId) ?? new Set<string>();
+    known.add(controllerId);
+    knownControllers.set(session.guestId, known);
+    const previousController =
+      previous === undefined ? undefined : socketControllers.get(previous.id);
+    if (previousController !== undefined && previousController !== controllerId) {
+      const superseded = supersededControllers.get(session.guestId) ?? new Set<string>();
+      superseded.add(previousController);
+      supersededControllers.set(session.guestId, superseded);
+    }
     options.sessionStore.claimController(session.guestId, controllerId);
     if (previous !== undefined && previous.id !== socket.id) {
       previous.emit("session:replaced");
@@ -124,32 +151,36 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
       process.stderr.write("Room reconnect failed\n");
     });
 
-    const watchCurrentRoom = () => {
+    const watchCurrentRoom = async (): Promise<boolean> => {
       const room = options.roomStore.getCurrent(session);
       if (room === null) return false;
-      void socket.join(room.code);
+      await socket.join(room.code);
       if (room.phase === "active") {
         socket.emit("game:snapshot", options.roomStore.getGameSnapshot(session, room.code));
       }
       return true;
     };
-    watchCurrentRoom();
+    void watchCurrentRoom().catch(() => {
+      process.stderr.write("Initial room watch failed\n");
+    });
 
     socket.on("room:watch", (acknowledge) => {
       if (typeof acknowledge !== "function") return;
-      try {
-        acknowledge(
-          watchCurrentRoom()
-            ? { ok: true }
-            : { code: "not-in-room", message: "Join a room first", ok: false },
-        );
-      } catch (error) {
-        acknowledge({
-          code: error instanceof RoomError ? error.code : "room-error",
-          message: error instanceof Error ? error.message : "Unable to watch this room",
-          ok: false,
+      void watchCurrentRoom()
+        .then((watched) => {
+          acknowledge(
+            watched
+              ? { ok: true }
+              : { code: "not-in-room", message: "Join a room first", ok: false },
+          );
+        })
+        .catch((error: unknown) => {
+          acknowledge({
+            code: error instanceof RoomError ? error.code : "room-error",
+            message: error instanceof Error ? error.message : "Unable to watch this room",
+            ok: false,
+          });
         });
-      }
     });
 
     socket.on("game:command", (input, acknowledge) => {

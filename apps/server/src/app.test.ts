@@ -1,7 +1,7 @@
 import { sessionViewSchema } from "@mahjong-together/shared";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "./app.js";
 import { guestTokenFromCookieHeader, SessionStore } from "./identity/sessions.js";
@@ -15,9 +15,24 @@ afterEach(async () => {
       .splice(0)
       .map((server) => new Promise<void>((resolve) => server.close(() => resolve()))),
   );
+  vi.unstubAllEnvs();
 });
 
 describe("health endpoint", () => {
+  it("fails closed when production starts without an application origin", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_ORIGIN", "");
+    expect(() => createApp()).toThrow("APP_ORIGIN must be set");
+    vi.unstubAllEnvs();
+  });
+
+  it("rejects a non-HTTPS external production origin", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_ORIGIN", "http://mahjong.example");
+    expect(() => createApp()).toThrow("APP_ORIGIN must use HTTPS");
+    vi.unstubAllEnvs();
+  });
+
   it("returns only the service status", async () => {
     const server = createServer(createApp());
     servers.push(server);
@@ -135,6 +150,40 @@ describe("guest and lobby HTTP API", () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ code: "origin-rejected" });
+  });
+
+  it("returns no current room after an in-memory server restart", async () => {
+    const origin = "http://mahjong.test";
+    const firstSessions = new SessionStore();
+    const firstRooms = new RoomStore({ codeFactory: () => "restartcode1" });
+    const firstBaseUrl = await listen(
+      createApp({ appOrigin: origin, roomStore: firstRooms, sessionStore: firstSessions }),
+    );
+    const guest = await establishSession(firstBaseUrl, origin, firstSessions);
+    const created = await postJson(firstBaseUrl, origin, guest, "/api/rooms", {
+      commandId: randomUUID(),
+      nickname: "Host",
+    });
+    expect(created.status).toBe(201);
+
+    const secondBaseUrl = await listen(
+      createApp({
+        appOrigin: origin,
+        roomStore: new RoomStore(),
+        sessionStore: new SessionStore(),
+      }),
+    );
+    const recoveredSession = await fetch(`${secondBaseUrl}/api/session`, {
+      headers: { cookie: guest.cookie, origin },
+      method: "POST",
+    });
+    expect(recoveredSession.status).toBe(201);
+    const recoveredCookie = cookieHeader(recoveredSession.headers.get("set-cookie"));
+    const current = await fetch(`${secondBaseUrl}/api/rooms/current`, {
+      headers: { cookie: recoveredCookie },
+    });
+    expect(current.status).toBe(200);
+    await expect(current.json()).resolves.toEqual({ room: null });
   });
 
   it("replays lobby commands once and rejects command-ID payload changes", async () => {

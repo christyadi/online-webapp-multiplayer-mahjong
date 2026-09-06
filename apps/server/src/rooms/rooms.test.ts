@@ -117,6 +117,33 @@ describe("room lobby", () => {
     );
   });
 
+  it("keeps dealer rotation when the host returns a completed table to the lobby", () => {
+    let handCount = 0;
+    const dealers: number[] = [];
+    const store = new RoomStore({
+      codeFactory: () => "dealerlobby1",
+      handFactory: (dealer) => {
+        dealers.push(dealer);
+        handCount += 1;
+        const hand = startHand(
+          `00000000-0000-4000-8000-${String(handCount).padStart(12, "0")}`,
+          dealer,
+          createTileSet(),
+        );
+        return handCount === 1 ? { ...hand, phase: "hand-ended", result: { kind: "draw" } } : hand;
+      },
+    });
+    const room = store.create(guest(1), "Host");
+    store.setReady(guest(1), room.code, true);
+    store.start(guest(1), room.code);
+    store.returnToLobby(guest(1), room.code);
+    store.setReady(guest(1), room.code, true);
+    store.start(guest(1), room.code);
+
+    expect(dealers).toEqual([0, 1]);
+    expect(store.getGameSnapshot(guest(1), room.code).dealer).toBe(1);
+  });
+
   it("releases a host who disconnects after results and transfers result controls", async () => {
     const ended: HandEndedState = {
       ...startHand("00000000-0000-4000-8000-000000000004", 0, createTileSet()),

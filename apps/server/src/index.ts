@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 
-import { createApp } from "./app.js";
+import { createApp, resolveAppOrigin } from "./app.js";
 import { SessionStore } from "./identity/sessions.js";
 import { configureRealtime } from "./realtime.js";
 import { RoomStore } from "./rooms/rooms.js";
@@ -17,7 +17,7 @@ const realtimeServer = new Server(httpServer, {
   pingInterval: 10_000,
   pingTimeout: 10_000,
 });
-const appOrigin = process.env.APP_ORIGIN;
+const appOrigin = resolveAppOrigin(process.env.APP_ORIGIN);
 const stopRealtime = configureRealtime(realtimeServer, {
   ...(appOrigin === undefined ? {} : { appOrigin }),
   roomStore,

@@ -4,7 +4,7 @@ const port = 4173;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: ["results.spec.ts", "claims.spec.ts"],
+  testIgnore: ["results.spec.ts", "claims.spec.ts", "wins.spec.ts", "kongs.spec.ts"],
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,
@@ -27,6 +27,24 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "tablet-chromium", use: { ...devices["iPad Pro 11"], browserName: "chromium" } },
+    {
+      name: "phone-portrait",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        isMobile: true,
+        viewport: { height: 844, width: 390 },
+      },
+    },
+    {
+      name: "phone-landscape",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        isMobile: true,
+        viewport: { height: 390, width: 844 },
+      },
+    },
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],

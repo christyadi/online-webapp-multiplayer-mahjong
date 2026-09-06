@@ -47,6 +47,7 @@ type Room = {
   deadlineTimerCancel: (() => void) | null;
   hand: HandState | null;
   lastActivityAt: number;
+  nextDealer: SeatIndex | null;
   noConnectedHumansSince: number | null;
   phase: "lobby" | "active";
   queue: Promise<void>;
@@ -117,6 +118,7 @@ export class RoomStore {
       deadlineTimerCancel: null,
       hand: null,
       lastActivityAt: now,
+      nextDealer: null,
       noConnectedHumansSince: null,
       phase: "lobby",
       queue: Promise.resolve(),
@@ -200,16 +202,17 @@ export class RoomStore {
     for (const seatIndex of [0, 1, 2, 3] as const) {
       room.seats[seatIndex] ??= { kind: "bot" };
     }
-    const dealer = rematch
-      ? rotateDealer(previousHand.dealer)
-      : (() => {
-          const dealerIndex = room.seats.findIndex(
-            (occupant) => occupant?.kind === "human" && occupant.host,
-          );
-          if (dealerIndex === -1) throw new Error("Lobby host invariant failed");
-          return dealerIndex as SeatIndex;
-        })();
+    const dealer =
+      room.nextDealer ??
+      (() => {
+        const dealerIndex = room.seats.findIndex(
+          (occupant) => occupant?.kind === "human" && occupant.host,
+        );
+        if (dealerIndex === -1) throw new Error("Lobby host invariant failed");
+        return dealerIndex as SeatIndex;
+      })();
     room.hand = this.#handFactory(dealer);
+    room.nextDealer = rotateDealer(room.hand.dealer);
     room.phase = "active";
     room.lastActivityAt = this.#clock();
     room.roomRevision += 1;
@@ -422,7 +425,10 @@ export class RoomStore {
   ): void {
     const previousDecision = room.hand?.phase === "hand-ended" ? null : room.hand?.decisionId;
     room.hand = result.state;
-    if (result.state.phase === "hand-ended") this.resetReadyAfterHand(room);
+    if (result.state.phase === "hand-ended") {
+      room.nextDealer = rotateDealer(result.state.dealer);
+      this.resetReadyAfterHand(room);
+    }
     room.roomRevision += 1;
     room.lastActivityAt = this.#clock();
     if (!deferAutomation) {
@@ -743,6 +749,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
     activeSeat: hand.phase === "awaiting-discard" ? hand.turn : null,
     deadline: room.deadline,
     decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
+    dealer: hand.dealer,
     handId: hand.handId,
     legalActions: legalActionsForSeat(hand, viewerSeat),
     pendingAddedKong,

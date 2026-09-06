@@ -256,6 +256,37 @@ describe("Socket.IO game protocol", () => {
       await harness.close();
     }
   });
+
+  it("rejects automatic reconnection from a controller superseded by a newer tab", async () => {
+    const harness = await createHarness(false);
+    let replacement: TestClient | null = null;
+    try {
+      harness.clients[0].connect();
+      await waitForConnect(harness.clients[0]);
+      const replaced = new Promise<void>((resolve) =>
+        harness.clients[0].once("session:replaced", resolve),
+      );
+      replacement = connect(harness.url, {
+        auth: { controllerId: uuid(800) },
+        autoConnect: false,
+        extraHeaders: {
+          Cookie: `${GUEST_COOKIE_NAME}=${harness.tokens[0]}`,
+          Origin: harness.origin,
+        },
+        transports: ["websocket"],
+      });
+      replacement.connect();
+      await Promise.all([replaced, waitForConnect(replacement)]);
+
+      const rejected = nextConnectError(harness.clients[0]);
+      harness.clients[0].connect();
+      await expect(rejected).resolves.toBe("controller-replaced");
+      expect(replacement.connected).toBe(true);
+    } finally {
+      replacement?.disconnect();
+      await harness.close();
+    }
+  });
 });
 
 async function createHarness(prepareRoom = true): Promise<
