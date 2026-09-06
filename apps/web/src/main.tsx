@@ -923,10 +923,7 @@ function Table({
           </p>
         )}
         <div className="table-footer">
-          <p>
-            Live table · server revision {game.roomRevision} ·{" "}
-            {realtime?.connected ? "Connected" : "Reconnecting…"}
-          </p>
+          <p>{realtime?.connected ? "Connected" : "Reconnecting…"}</p>
           <button className="text-button" onClick={onLeave} type="button">
             Leave game
           </button>
