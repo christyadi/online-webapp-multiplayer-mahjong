@@ -643,7 +643,7 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
         <div className="table-felt" aria-label="Four-sided mahjong table">
           {game.players.map((player) => (
             <div
-              className={`table-seat seat-position-${seatPosition(player.seat)}`}
+              className={`table-seat seat-position-${seatPosition(player.seat, game.viewerSeat)}`}
               key={player.seat}
             >
               <PlayerPanel game={game} player={player} />
@@ -908,16 +908,17 @@ function seatName(seat: number): string {
   return SEAT_NAMES[seat as 0 | 1 | 2 | 3];
 }
 
-function seatPosition(seat: number): "north" | "east" | "south" | "west" {
-  switch (seat) {
+function seatPosition(seat: number, viewerSeat: number): "north" | "east" | "south" | "west" {
+  const offset = (seat - viewerSeat + 4) % 4;
+  switch (offset) {
     case 0:
-      return "east";
-    case 1:
       return "south";
-    case 2:
+    case 1:
       return "west";
-    default:
+    case 2:
       return "north";
+    default:
+      return "east";
   }
 }
 

@@ -182,6 +182,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Added native SVG hover titles containing each tile's name and numeric value, with matching accessible labels.
 - Reworked the felt into a four-sided board: East/South/West/North each have a positioned player card, while one central discard pool contains all public discards.
 - Expanded gameplay to full viewport width and height on desktop; mobile keeps a readable content-sized scroll layout. The browser regression now checks the table fills the viewport.
+- Rotated seat placement relative to the viewer so the viewer's player card and complete hand rack always occupy the lower side; side seats no longer constrain the hand to a narrow right column.
 - Added regression assertions for four seat cards, centralized discards, no per-player discard strips, and value-bearing tile labels.
 
 ## Next exact step
