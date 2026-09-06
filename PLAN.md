@@ -30,3 +30,7 @@
 - [x] Sort revealed opponent concealed tiles by Mahjong type and stable physical-tile ID at hand end.
 - [x] Make leaving an active hand release the guest session so a new room can be created immediately.
 - [x] Add a host-only Play again action that starts a fresh hand after hand completion.
+- [x] Collapse multiple legal Chow combinations into one Chow action with an explicit option selector.
+- [x] Offer host auto-rematch after a 15-second countdown, with a checkbox to opt out.
+- [x] Make the board use more tablet/desktop space while retaining the mobile fallback.
+- [x] Guard leave mutations against duplicate clicks and preserve immediate new-room creation.

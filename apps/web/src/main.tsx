@@ -388,6 +388,7 @@ function Lobby({
   const viewer = room.seats[room.viewerSeat];
   const viewerIsHost = viewer?.kind === "human" && viewer.host;
   const inviteUrl = `${window.location.origin}/room/${room.code}`;
+  const leaveInFlight = useRef(false);
 
   const mutate = async (path: string, body: Record<string, unknown>) => {
     setPending(true);
@@ -408,8 +409,10 @@ function Lobby({
   };
 
   const leaveGame = () => {
+    if (leaveInFlight.current) return;
     if (room.phase === "active" && !window.confirm("Leave this hand and give your seat to a bot?"))
       return;
+    leaveInFlight.current = true;
     onInvalidateRoomRequests();
     setPending(true);
     void requestJson(`/api/rooms/${room.code}/leave`, undefined, {
@@ -422,7 +425,10 @@ function Lobby({
         if (isRoomExpiredError(caught)) onExpired();
         else onError(errorMessage(caught));
       })
-      .finally(() => setPending(false));
+      .finally(() => {
+        leaveInFlight.current = false;
+        setPending(false);
+      });
   };
 
   if (room.phase === "active" && game !== null) {
@@ -583,7 +589,10 @@ function Table({
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
+  const [autoPlayAgain, setAutoPlayAgain] = useState(true);
+  const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  const playAgainRef = useRef(onPlayAgain);
   const viewer = game.players.find((player) => player.seat === game.viewerSeat);
   const legal = game.legalActions;
   const commandPending = pendingDecisionId === game.decisionId;
@@ -612,6 +621,25 @@ function Table({
       ? null
       : Math.max(0, game.deadline - game.serverTime - (clock - game.serverTime));
   const seconds = deadlineRemaining === null ? null : Math.ceil(deadlineRemaining / 1000);
+
+  useEffect(() => {
+    playAgainRef.current = onPlayAgain;
+  }, [onPlayAgain]);
+
+  useEffect(() => {
+    if (!canPlayAgain || game.phase !== "hand-ended" || !autoPlayAgain || pending) {
+      return;
+    }
+    const deadline = Date.now() + 15_000;
+    const interval = window.setInterval(() => {
+      setAutoPlaySeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1_000)));
+    }, 250);
+    const timeout = window.setTimeout(() => playAgainRef.current(), 15_000);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [autoPlayAgain, canPlayAgain, game.phase, pending]);
 
   useEffect(() => {
     if (game.phase === "hand-ended" || game.deadline === null) return;
@@ -747,8 +775,11 @@ function Table({
 
         {game.result === null ? null : (
           <ResultBanner
+            autoPlayAgain={autoPlayAgain}
+            autoPlaySeconds={autoPlaySeconds}
             canPlayAgain={canPlayAgain}
             game={game}
+            onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
             onToggleOpponentTiles={() => setShowOpponentTiles((visible) => !visible)}
             onPlayAgain={onPlayAgain}
             pending={pending}
@@ -903,6 +934,7 @@ function ActionBar({
   onAction: (action: GameCommand["action"]) => void;
   selectedTileId: string | null;
 }>) {
+  const [chowChoiceIndex, setChowChoiceIndex] = useState(0);
   const disabled = commandPending || game.decisionId === null;
   if (legal.kind === "none") return <p className="action-hint">Waiting for the table…</p>;
   if (legal.kind === "discard") {
@@ -983,22 +1015,40 @@ function ActionBar({
             Kong
           </button>
         ) : null}
-        {legal.legal.chows.map((chow, index) => (
+        {legal.legal.chows.length > 1 ? (
+          <select
+            aria-label="Chow combination"
+            className="chow-choice"
+            disabled={disabled}
+            onChange={(event) => setChowChoiceIndex(Number(event.target.value))}
+            value={String(Math.min(chowChoiceIndex, legal.legal.chows.length - 1))}
+          >
+            {legal.legal.chows.map((_, index) => (
+              <option key={index} value={String(index)}>
+                Chow option {String(index + 1)}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {legal.legal.chows.length === 0 ? null : (
           <button
             className="secondary"
             disabled={disabled}
-            key={index}
-            onClick={() =>
-              onAction({
-                choice: { kind: "chow", tileIds: chow.tileIds },
-                kind: "respond-to-discard",
-              })
-            }
+            onClick={() => {
+              const chow =
+                legal.legal.chows[Math.min(chowChoiceIndex, legal.legal.chows.length - 1)];
+              if (chow !== undefined) {
+                onAction({
+                  choice: { kind: "chow", tileIds: chow.tileIds },
+                  kind: "respond-to-discard",
+                });
+              }
+            }}
             type="button"
           >
             Chow
           </button>
-        ))}
+        )}
       </div>
     );
   return (
@@ -1022,15 +1072,21 @@ function ActionBar({
 }
 
 function ResultBanner({
+  autoPlayAgain,
+  autoPlaySeconds,
   canPlayAgain,
   game,
+  onToggleAutoPlay,
   onToggleOpponentTiles,
   onPlayAgain,
   pending,
   showOpponentTiles,
 }: Readonly<{
+  autoPlayAgain: boolean;
+  autoPlaySeconds: number | null;
   canPlayAgain: boolean;
   game: GameSnapshot;
+  onToggleAutoPlay: () => void;
   onToggleOpponentTiles: () => void;
   onPlayAgain: () => void;
   pending: boolean;
@@ -1048,6 +1104,17 @@ function ResultBanner({
             : `Win by ${result.source.replaceAll("-", " ")}.`}
         </span>
       </div>
+      <label className="auto-play-option">
+        <input
+          checked={autoPlayAgain}
+          disabled={!canPlayAgain || pending}
+          onChange={onToggleAutoPlay}
+          type="checkbox"
+        />
+        {canPlayAgain
+          ? `Auto-play next hand${autoPlayAgain && autoPlaySeconds !== null ? ` in ${String(autoPlaySeconds)}s` : ""}`
+          : "Waiting for host"}
+      </label>
       <button
         className="secondary"
         disabled={!canPlayAgain || pending}

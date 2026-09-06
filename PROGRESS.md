@@ -175,7 +175,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The active task is now explicitly updated to create the actual playable interface requested by the user: a real table view, visible local SVG tile art, hand selection/discard controls, claim/win/kong actions, server deadline display, reconnect/controller status, and hand results.
 - The table is responsive down to narrow mobile widths, uses 44px-or-larger controls, keeps opponent concealed tiles private, exposes a native keyboard-accessible help panel, and renders public discards/meld context plus the current wall count.
 - Added a Chromium end-to-end flow that starts a hand with bots, verifies 14 visible tile faces, selects a tile, enables the discard action, sends it through the live Socket.IO command path, and confirms the table remains synchronized.
-- Verification: formatting, strict typecheck, lint, production build, 79 Vitest tests, and all 5 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
+- Verification: formatting, strict typecheck, lint, production build, 80 Vitest tests, and all 6 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
 ## Milestone 7 feedback integrated
 
@@ -197,6 +197,10 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Fixed active-table leave to execute the server leave mutation before returning home, releasing the guest for immediate room creation.
 - Added a host-only `Play again` control on the result banner; rematches create a fresh hand and rotate the dealer while preserving the room and seats.
 - Added regressions for active-hand leave/new-room recovery and server-side rematch behavior.
+- Consolidated multiple legal Chow combinations into one visible Chow button plus an accessible combination selector, removing duplicate Chow actions without losing choice.
+- Added an enabled-by-default host auto-rematch countdown that starts the next hand after 15 seconds; the result banner includes an opt-out checkbox and manual Play again control.
+- Expanded the desktop/tablet felt sizing while keeping the narrow mobile layout content-sized.
+- Added an in-flight leave guard to prevent duplicate leave requests during the transition back to the home screen.
 
 ## Next exact step
 
