@@ -268,6 +268,12 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The selected theme is stored locally; first use falls back to the operating-system dark-mode preference. CSS tokens cover page surfaces, table felt, cards, forms, controls, status states, and focus outlines while preserving readable tile faces.
 - Verification: formatting, lint, strict typecheck, production build, and Chromium/WebKit/tablet/phone home-screen smoke flows pass, including toggle persistence after reload. Firefox remains deferred at the user's direction.
 
+## Supplied visual direction recorded (2026-09-07)
+
+- Read the four supplied reference files and extracted their reusable design ideas into [DESIGN.md](./DESIGN.md): tactile ivory tiles, wood framing, continuous felt, brass hierarchy, physical wall/pond composition, restrained motion, and selective landing-page material framing.
+- Recorded the reference boundaries in `SPEC.md` and `DECISIONS.md`: the demos’ external Google Fonts, Unicode glyph dependency, inline/random demo logic, audio clack, and marketing claims are not production instructions and remain excluded by the fixed product constraints.
+- Added unchecked follow-up tasks to `PLAN.md` for applying the visual direction to the existing real game. No gameplay code was changed in this documentation pass.
+
 ## Next exact step
 
 The implementation and local verification are complete. Public deployment remains deliberately incomplete: connecting the private GitHub repository would grant Render OAuth access, and the Render Hobby account cannot guarantee a zero-spend hard cap because overage can be billable. Deployment requires the user's explicit decision on that OAuth access and overage policy; Firefox remains deferred.

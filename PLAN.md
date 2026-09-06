@@ -44,6 +44,18 @@
 - [x] Exercise an in-browser Chow choice with its exact selector labels and confirm the exposed meld reaches both human players.
 - [x] Add a persisted light/dark theme toggle with system-preference fallback and readable contrast across landing, lobby, table, tiles, results, and status surfaces.
 
+## Supplied visual direction integration (captured 2026-09-07)
+
+The attached HTML concepts and design-system note are recorded in [DESIGN.md](./DESIGN.md). Their visual principles are planned follow-up work; their external fonts, Unicode glyph implementation, audio, and demo scripts are explicitly out of scope.
+
+- [ ] Rework the gameplay surface toward one continuous felt plane with restrained wood HUD/rack framing, a scarce brass hierarchy accent, and dark-mode equivalents that preserve contrast.
+- [ ] Refine tile rendering as a physical object: consistent ivory bevel/depth, distinct woven back, perspective-preserving selected state, separated drawn tile, and stable small/medium/large proportions using the existing local SVG assets.
+- [ ] Refine spatial hierarchy into top/side opponents, physical wall treatment, central discard pond, and lower local rack/action dock. Keep the pond stable, explain its empty state, and retain an owner-color legend.
+- [ ] Add a readable latest public-action cue and an accessible live-region announcement. Use restrained origin-to-pond discard motion and an active-seat timer/glow that remain clear with reduced motion disabled.
+- [ ] Add a restrained winner celebration tied to the result banner without obscuring tiles or controls, with a static reduced-motion fallback.
+- [ ] Apply the landing reference selectively: wood frame, felt hero, one oversized tile gesture, ivory material/suit accents, and brass CTA hierarchy, while keeping create/join as the primary first-viewport workflow.
+- [ ] Verify the material, hierarchy, dark mode, keyboard/touch reachability, and normal-turn no-scroll behavior at 1440×900, iPad Pro 11, 390×844, and 844×390.
+
 ## Future UX refinement backlog (captured 2026-09-06)
 
 These are planned follow-up improvements from the latest player review. They are intentionally unchecked and do not change the completed gameplay milestone.

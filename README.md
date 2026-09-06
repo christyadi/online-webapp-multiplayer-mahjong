@@ -34,4 +34,4 @@ The interface includes an accessible light/dark mode toggle. It follows the syst
 
 `test:e2e` runs the desktop Chromium gate. The isolated `claims`, `kongs`, `results`, and `wins` suites cover exact Chow choices, an added-Kong upgrade, rematch lifecycle, and the winning result presentation. `test:e2e:phone` uses the exact 390×844 and 844×390 Chromium viewports; `test:e2e:tablet` uses iPad Pro 11 Chromium; and `test:e2e:webkit` is the Safari-engine gate. `test:e2e:all` runs every standard and isolated suite, including Firefox, so it remains intentionally deferred at the user's direction.
 
-See [SPEC.md](./SPEC.md), [RULES.md](./RULES.md), and [DEPLOYMENT.md](./DEPLOYMENT.md).
+See [SPEC.md](./SPEC.md), [PLAN.md](./PLAN.md), [DESIGN.md](./DESIGN.md), [RULES.md](./RULES.md), and [DEPLOYMENT.md](./DEPLOYMENT.md).
