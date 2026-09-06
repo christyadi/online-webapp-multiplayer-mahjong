@@ -2,6 +2,10 @@
 
 The release target is one Render Free Node web service connected to the new private GitHub repository. It serves the site, API, and Socket.IO from one process; no database, persistent disk, add-on, custom domain, or second service is used.
 
+## Current status
+
+Deployment is intentionally deferred while the visual-design direction and implementation plan are completed. The user will manually configure Render afterward. This document preserves the required settings; do not create a service, request provider access, or claim public verification during the refinement phase.
+
 ## Render settings
 
 - Runtime: Node

@@ -196,6 +196,8 @@ Set a goal to build, test, and publicly deploy the Mahjong Together web game des
 
 **Solution:** follow the fixed hosting policy. Configure the build command npm ci && npm run build, start command npm start, /api/health, Node 24, production environment, and the actual app origin. Use a new private GitHub repository under the user's account named mahjong-together, or mahjong-together-2 and then the next free numeric suffix if occupied; do not overwrite an existing repository. Connect only that repository to the new Render service. Disable automatic deploys after the initial verified release so routine pushes do not interrupt games. Use the provider-generated HTTPS URL; no custom domain.
 
+**Sequencing:** visual-design and UX work take priority. The user will manually configure the Render service only after those design and planning tasks are complete; do not request provider access or create a service during that phase. Resume this milestone after the user provides the deployed URL.
+
 **Done when:** the public health endpoint works, the actual public page loads, and two isolated browser sessions on that URL join the same private room and exchange legal moves. Verify invite deep links, refresh/reconnect, HTTPS/socket connectivity, and an end/rematch path. If account access or provider verification is missing, finish all deployment files and other work, document the exact remaining step, and leave deployment explicitly incomplete.
 
 ### 10. Deliver and stop

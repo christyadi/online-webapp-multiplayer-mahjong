@@ -1,5 +1,14 @@
 # Build plan
 
+## Current priority (2026-09-07)
+
+Visual-design and UX refinement are the active priorities. Public deployment is intentionally deferred: after the design direction and plan are complete, the user will manually configure Render. Do not start a Render service, request provider access, or perform public-service verification during the current refinement work.
+
+- [ ] Complete the unchecked visual-direction and UX-refinement work below.
+- [ ] Verify the completed experience across the required viewports and assistive paths.
+- [ ] Hand off the preserved deployment configuration to the user for manual setup.
+- [ ] Resume public-service verification only after the user provides a deployed URL.
+
 - [x] 1. Establish isolated repository, Ponytail guidance, exact toolchain, workspaces, repeatable commands, health route, production serving, review, and checkpoint commit.
 - [x] 2. Implement physical tiles, crypto/injectable shuffle and deal, normal-hand decomposition, and seven-pairs validation.
 - [x] 3. Implement and invariant-test the pure hand state machine, all claims and kongs, final-wall behavior, and dealer rotation.
@@ -8,8 +17,8 @@
 - [x] 6. Implement deterministic bots, timeouts, disconnect takeover/rejoin, duplicate-tab control, restart behavior, and 100 simulations.
 - [x] 7. Complete the responsive, accessible playable interface, local SVG tile art, help, reconnect, results, and rematches.
 - [x] 8. Verify integrated two-human/two-bot play across desktop engines and mobile Chromium, including reconnect, claims, and rematch (Firefox deferred at the user's direction).
-- [ ] 9. Create the private GitHub repository and one zero-spend Render Free service; verify the public page, health, sockets, invite deep links, reconnect, and hand/rematch.
-- [ ] 10. Complete three specialist final reviews and corrected re-review, release commit, and user handoff; leave the branch unmerged.
+- [ ] 9. Deferred by user — after the design and plan are complete, manually configure the private GitHub repository and one zero-spend Render Free service; then verify the public page, health, sockets, invite deep links, reconnect, and hand/rematch.
+- [ ] 10. After the user-configured deployment is verified, complete three specialist final reviews and corrected re-review, release commit, and user handoff; leave the branch unmerged.
 
 ## Milestone 7 UI refinement feedback
 

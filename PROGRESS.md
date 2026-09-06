@@ -274,6 +274,12 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Recorded the reference boundaries in `SPEC.md` and `DECISIONS.md`: the demos’ external Google Fonts, Unicode glyph dependency, inline/random demo logic, audio clack, and marketing claims are not production instructions and remain excluded by the fixed product constraints.
 - Added unchecked follow-up tasks to `PLAN.md` for applying the visual direction to the existing real game. No gameplay code was changed in this documentation pass.
 
+## Deployment sequencing update (2026-09-07)
+
+- The user will manually configure Render only after the visual-design direction and implementation plan are complete.
+- Public deployment is deliberately deferred and is no longer the active blocker for visual/UX refinement. Do not request provider OAuth access, create a service, or perform public verification during this phase.
+- `DEPLOYMENT.md` preserves the exact prospective configuration for the later user-owned setup.
+
 ## Next exact step
 
-The implementation and local verification are complete. Public deployment remains deliberately incomplete: connecting the private GitHub repository would grant Render OAuth access, and the Render Hobby account cannot guarantee a zero-spend hard cap because overage can be billable. Deployment requires the user's explicit decision on that OAuth access and overage policy; Firefox remains deferred.
+Complete the unchecked visual-direction and UX-refinement work in `PLAN.md`, then verify it across the required desktop, tablet, phone, accessibility, and reduced-motion paths. The user will manually configure Render afterward; public verification resumes only once they provide the deployed URL. Firefox remains deferred.
