@@ -24,5 +24,25 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
   },
-  projects: [{ name: "claim-chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "claim-chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "claim-phone-portrait",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        isMobile: true,
+        viewport: { height: 844, width: 390 },
+      },
+    },
+    {
+      name: "claim-phone-landscape",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        isMobile: true,
+        viewport: { height: 390, width: 844 },
+      },
+    },
+  ],
 });

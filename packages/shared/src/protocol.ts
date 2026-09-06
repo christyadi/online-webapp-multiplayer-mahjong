@@ -122,6 +122,7 @@ export const gameSnapshotSchema = z.object({
   deadline: z.number().int().nullable(),
   decisionId: z.string().nullable(),
   dealer: z.number().int().min(0).max(3),
+  drawnTileId: z.string().nullable(),
   handId: z.uuid(),
   legalActions: snapshotLegalActionsSchema,
   pendingAddedKong: z

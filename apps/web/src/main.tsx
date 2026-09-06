@@ -11,8 +11,18 @@ import {
   type GameCommand,
   type GameSnapshot,
   type RoomView,
+  type TileType,
 } from "@mahjong-together/shared";
-import { StrictMode, useCallback, useEffect, useRef, useState, type SyntheticEvent } from "react";
+import {
+  StrictMode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { io, type Socket } from "socket.io-client";
 
@@ -25,6 +35,8 @@ const OCCUPIED_ROOM_STORAGE_KEY = "mahjong-together:occupied-room";
 const THEME_STORAGE_KEY = "mahjong-together:theme";
 
 type Theme = "light" | "dark";
+
+const HOME_TILE = { id: "decorative-bamboo-6", type: "b6" } as const;
 
 function readThemePreference(): Theme {
   try {
@@ -335,8 +347,11 @@ function App() {
   }
 
   return (
-    <main>
-      <section className="welcome-card" aria-labelledby="page-title">
+    <main className="home-page">
+      <section className="welcome-card home-card" aria-labelledby="page-title">
+        <div aria-hidden="true" className="home-hero-tile">
+          <TileArt tile={HOME_TILE} />
+        </div>
         <p className="eyebrow">Private games for friends</p>
         <h1 id="page-title">Mahjong Together</h1>
         <p>Simple Chinese house rules for one to four people. Empty seats are filled by bots.</p>
@@ -737,12 +752,21 @@ function Table({
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
   const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  const [latestPublicAction, setLatestPublicAction] = useState(() => initialPublicAction(game));
   const autoPlayIntervalRef = useRef<number | null>(null);
   const autoPlayTimeoutRef = useRef<number | null>(null);
   const playAgainRef = useRef(onPlayAgain);
+  const previousGame = useRef(game);
+  const touchTileDrag = useRef<Readonly<{
+    pointerId: number;
+    sourceId: string;
+    x: number;
+    y: number;
+  }> | null>(null);
   const viewer = game.players.find((player) => player.seat === game.viewerSeat);
   const legal = game.legalActions;
   const commandPending = pendingDecisionId === game.decisionId;
@@ -755,6 +779,31 @@ function Table({
   const orderedTiles = orderedTileIds
     .map((id) => serverTiles.find((tile) => tile.id === id))
     .filter((tile): tile is (typeof serverTiles)[number] => tile !== undefined);
+  const reorderTile = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setTileOrder((current) =>
+      moveTile(current.length === 0 ? serverTileIds : current, sourceId, targetId, serverTileIds),
+    );
+  };
+  const moveSelectedTile = (direction: -1 | 1) => {
+    if (selectedTileId === null) return;
+    setTileOrder((current) => {
+      const order = [
+        ...current.filter((id) => serverTileIds.includes(id)),
+        ...serverTileIds.filter((id) => !current.includes(id)),
+      ];
+      const currentIndex = order.indexOf(selectedTileId);
+      const nextIndex = currentIndex + direction;
+      if (currentIndex === -1 || nextIndex < 0 || nextIndex >= order.length) return order;
+      const [tile] = order.splice(currentIndex, 1);
+      if (tile === undefined) return order;
+      order.splice(nextIndex, 0, tile);
+      return order;
+    });
+  };
+  const selectTile = (tileId: string) => {
+    setSelectedTileId((selected) => (selected === tileId ? null : tileId));
+  };
   const sortHand = () => {
     setTileOrder(
       [...serverTiles]
@@ -813,6 +862,15 @@ function Table({
     return () => window.clearInterval(timer);
   }, [game.deadline, game.phase]);
 
+  useEffect(() => {
+    const previous = previousGame.current;
+    if (previous.roomRevision !== game.roomRevision || previous.handId !== game.handId) {
+      const nextAction = publicActionSince(previous, game);
+      if (nextAction !== null) setLatestPublicAction(nextAction);
+      previousGame.current = game;
+    }
+  }, [game]);
+
   if (viewer === undefined)
     return <StatusCard message="Your seat is unavailable." title="Table error" />;
 
@@ -853,17 +911,38 @@ function Table({
     <main className="table-page">
       <section className="table-shell" aria-labelledby="table-title">
         <header className="table-header">
-          <div>
-            <p className="eyebrow">
-              Room {room.code} · {SEAT_NAMES[game.viewerSeat]}
-            </p>
-            <h1 id="table-title">Hand starting · Mahjong table</h1>
-          </div>
-          <div className="table-status" aria-live="polite">
-            <span>
-              {game.phase === "hand-ended" ? "Hand complete" : game.phase.replaceAll("-", " ")}
+          <h1 className="sr-only" id="table-title">
+            Mahjong table
+          </h1>
+          <div className="table-identity">
+            <span aria-label={`${seatName(game.dealer)} is dealer`} className="dealer-wind">
+              {seatName(game.dealer).slice(0, 1)}
             </span>
-            {seconds === null ? null : <strong>{seconds}s</strong>}
+            <div>
+              <span className="table-room">Room {room.code}</span>
+              <span className="table-seat-label">You are {SEAT_NAMES[game.viewerSeat]}</span>
+            </div>
+          </div>
+          <div className="table-header-actions">
+            <div aria-atomic="true" aria-live="polite" className="table-activity" role="status">
+              <span>Table activity</span>
+              <strong>{latestPublicAction}</strong>
+            </div>
+            <div className="table-status" aria-label="Turn countdown">
+              <span>{game.phase === "hand-ended" ? "Hand complete" : "Live hand"}</span>
+              {seconds === null ? null : <strong>{seconds}s</strong>}
+            </div>
+            <button
+              aria-controls="table-rules"
+              aria-expanded={showRules}
+              aria-label="Table rules"
+              className="table-help-trigger"
+              onClick={() => setShowRules(true)}
+              title="How to play"
+              type="button"
+            >
+              <span aria-hidden="true">?</span>
+            </button>
           </div>
         </header>
 
@@ -873,20 +952,43 @@ function Table({
               className={`table-seat seat-position-${seatPosition(player.seat, game.viewerSeat)}`}
               key={player.seat}
             >
-              <PlayerPanel game={game} player={player} showOpponentTiles={showOpponentTiles} />
+              <PlayerPanel game={game} player={player} seconds={seconds} />
               {player.seat === game.viewerSeat ? (
                 <div className="hand-controls">
                   <div className="hand-tools">
                     <button className="secondary sort-button" onClick={sortHand} type="button">
                       Sort hand
                     </button>
-                    <span className="drag-hint">Drag tiles to reorder</span>
+                    <button
+                      aria-label="Move selected tile left"
+                      className="secondary reorder-button"
+                      disabled={
+                        selectedTileId === null || orderedTileIds.indexOf(selectedTileId) <= 0
+                      }
+                      onClick={() => moveSelectedTile(-1)}
+                      type="button"
+                    >
+                      Move left
+                    </button>
+                    <button
+                      aria-label="Move selected tile right"
+                      className="secondary reorder-button"
+                      disabled={
+                        selectedTileId === null ||
+                        orderedTileIds.indexOf(selectedTileId) === orderedTileIds.length - 1
+                      }
+                      onClick={() => moveSelectedTile(1)}
+                      type="button"
+                    >
+                      Move right
+                    </button>
+                    <span className="drag-hint">Drag tiles or select one to move it</span>
                   </div>
                   <div className="tile-rack" aria-label="Your concealed tiles">
                     {orderedTiles.map((tile) => (
                       <div
                         aria-label="Drag tile to reorder"
-                        className="draggable-tile"
+                        className={`draggable-tile${game.drawnTileId === tile.id ? " is-drawn-tile" : ""}`}
                         data-tile-id={tile.id}
                         draggable
                         key={tile.id}
@@ -898,21 +1000,44 @@ function Table({
                         onDrop={(event) => {
                           event.preventDefault();
                           const sourceId = event.dataTransfer.getData("text/plain");
-                          if (sourceId === "" || sourceId === tile.id) return;
-                          setTileOrder((current) =>
-                            moveTile(
-                              current.length === 0 ? serverTileIds : current,
-                              sourceId,
-                              tile.id,
-                              serverTileIds,
-                            ),
-                          );
+                          if (sourceId !== "") reorderTile(sourceId, tile.id);
                         }}
                       >
+                        <span
+                          aria-hidden="true"
+                          className="tile-drag-grip"
+                          onPointerCancel={() => {
+                            touchTileDrag.current = null;
+                          }}
+                          onPointerDown={(event) => {
+                            if (event.pointerType === "mouse") return;
+                            try {
+                              event.currentTarget.setPointerCapture(event.pointerId);
+                            } catch {
+                              // Synthetic touch events may not have an active pointer to capture.
+                            }
+                            touchTileDrag.current = {
+                              pointerId: event.pointerId,
+                              sourceId: tile.id,
+                              x: event.clientX,
+                              y: event.clientY,
+                            };
+                          }}
+                          onPointerUp={(event) => {
+                            const drag = touchTileDrag.current;
+                            touchTileDrag.current = null;
+                            if (drag?.pointerId !== event.pointerId) return;
+                            if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12)
+                              return;
+                            const target = document
+                              .elementFromPoint(event.clientX, event.clientY)
+                              ?.closest<HTMLElement>("[data-tile-id]")?.dataset.tileId;
+                            if (target === undefined || target === drag.sourceId) return;
+                            reorderTile(drag.sourceId, target);
+                          }}
+                        />
                         <TileArt
-                          onClick={() =>
-                            setSelectedTileId((selected) => (selected === tile.id ? null : tile.id))
-                          }
+                          onClick={() => selectTile(tile.id)}
                           selected={selectedTileId === tile.id}
                           tile={tile}
                         />
@@ -931,12 +1056,15 @@ function Table({
             </div>
           ))}
           <div className="table-center">
-            <div className="wall-counter">Wall · {game.wallCount}</div>
+            <div className="table-center-status">
+              <WallStack count={game.wallCount} />
+              <span className="center-wind" title="Dealer">
+                {seatName(game.dealer).slice(0, 1)}
+              </span>
+            </div>
             <DiscardPool game={game} />
             {game.pendingDiscard === null ? null : (
-              <div className="pending-discard">
-                Current discard <TileArt tile={game.pendingDiscard.tile} />
-              </div>
+              <span className="claim-window">Claims open for the latest discard</span>
             )}
           </div>
         </div>
@@ -955,24 +1083,10 @@ function Table({
             showOpponentTiles={showOpponentTiles}
           />
         )}
-        <details className="help-panel">
-          <summary>How to play</summary>
-          <ul>
-            <li>When your card says Playing, choose one tile and select Discard selected.</li>
-            <li>
-              On another player&apos;s discard, choose Pass, Win, Pung, Kong, or Chow when that
-              action is available. Only the next seat may Chow.
-            </li>
-            <li>
-              Win with four sets and a pair, or seven distinct pairs. The table resolves competing
-              claims by win, then kong or pung, then chow.
-            </li>
-            <li>
-              The server shows the remaining time for each turn. A disconnected human seat is
-              temporarily played by a bot and returns to human control when it reconnects.
-            </li>
-          </ul>
-        </details>
+        {showRules ? <RulesDialog onClose={() => setShowRules(false)} /> : null}
+        {showOpponentTiles ? (
+          <OpponentHandsDialog game={game} onClose={() => setShowOpponentTiles(false)} />
+        ) : null}
         {error === null ? null : (
           <p className="error" role="alert">
             {error}
@@ -992,18 +1106,13 @@ function Table({
 function PlayerPanel({
   game,
   player,
-  showOpponentTiles,
+  seconds,
 }: Readonly<{
   game: GameSnapshot;
   player: GameSnapshot["players"][number];
-  showOpponentTiles: boolean;
+  seconds: number | null;
 }>) {
   const isViewer = player.seat === game.viewerSeat;
-  const showTiles = !isViewer && game.phase === "hand-ended" && showOpponentTiles;
-  const revealedTiles = [...(player.concealedTiles ?? [])].sort((left, right) => {
-    const typeDifference = tileTypeIndex(left.type) - tileTypeIndex(right.type);
-    return typeDifference === 0 ? left.id.localeCompare(right.id) : typeDifference;
-  });
   const status = playerStatus(game, player.seat);
   return (
     <article
@@ -1020,23 +1129,20 @@ function PlayerPanel({
         {player.connected ? "Connected" : "Reconnecting"} ·{" "}
         {player.controller === "bot" ? "Bot control" : "Human control"}
       </small>
-      <span className={`turn-indicator turn-${status.kind}`} aria-live="polite">
-        {status.label}
-      </span>
+      <span className={`turn-indicator turn-${status.kind}`}>{status.label}</span>
+      {status.kind === "active" && seconds !== null ? (
+        <span aria-label={`${String(seconds)} seconds remaining`} className="seat-turn-timer">
+          {seconds}s remaining
+        </span>
+      ) : null}
       {isViewer ? null : (
         <div
           className="opponent-tiles"
-          aria-label={
-            showTiles
-              ? `${player.nickname ?? "Player"}'s revealed tiles`
-              : `${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`
-          }
+          aria-label={`${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`}
         >
-          {showTiles
-            ? revealedTiles.map((tile) => <TileArt key={tile.id} tile={tile} />)
-            : Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
-                <span className="tile-back" key={index} />
-              ))}
+          {Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
+            <span className="tile-back" key={index} />
+          ))}
         </div>
       )}
       {player.melds.length === 0 ? null : (
@@ -1045,6 +1151,11 @@ function PlayerPanel({
             <div className="meld-group" key={`${meld.kind}-${String(index)}`}>
               <span className="meld-name">
                 {meld.kind === "chow" ? "Chow" : meld.kind === "pung" ? "Pung" : "Kong"}
+              </span>
+              <span className="meld-summary">
+                {meld.tiles === null
+                  ? `${String(meld.tileCount)} concealed tiles`
+                  : meld.tiles.map((tile) => compactTileLabel(tile.type)).join(" · ")}
               </span>
               <div className="meld-tiles">
                 {(meld.tiles ?? []).map((tile) => (
@@ -1062,6 +1173,14 @@ function PlayerPanel({
       )}
     </article>
   );
+}
+
+function compactTileLabel(type: TileType): string {
+  const details = suitedTileDetails(type);
+  if (details !== null) return `${String(details.rank)} of ${details.suit}`;
+  return type === "east" || type === "south" || type === "west" || type === "north"
+    ? `${type} wind`
+    : `${type} dragon`;
 }
 
 function playerStatus(
@@ -1085,13 +1204,26 @@ function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
   );
   return (
     <div className="discard-pool" aria-label="All discarded tiles">
-      <span className="discard-pool-label">Discard pool</span>
+      <div className="discard-pool-heading">
+        <span className="discard-pool-label">Central pond</span>
+        <span aria-label="Discard ownership colors" className="discard-legend">
+          {game.players.map((player) => (
+            <span className="discard-legend-item" key={player.seat}>
+              <i aria-hidden="true" className={`seat-dot seat-${String(player.seat)}`} />
+              {seatName(player.seat)}
+            </span>
+          ))}
+        </span>
+      </div>
       {discards.length === 0 ? (
-        <span className="discard-empty">No discards yet</span>
+        <span className="discard-empty">Waiting for the first discard</span>
       ) : (
         <div className="discard-grid">
           {discards.map(({ player, tile }) => (
-            <span className={`discard-tile seat-accent-${String(player.seat)}`} key={tile.id}>
+            <span
+              className={`discard-tile seat-accent-${String(player.seat)}${game.pendingDiscard?.tile.id === tile.id ? " is-latest-discard" : ""}`}
+              key={tile.id}
+            >
               <TileArt tile={tile} />
             </span>
           ))}
@@ -1099,6 +1231,230 @@ function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
       )}
     </div>
   );
+}
+
+function WallStack({ count }: Readonly<{ count: number }>) {
+  return (
+    <div aria-label={`${String(count)} tiles remaining in the wall`} className="wall-stack">
+      <span aria-hidden="true" className="wall-tile wall-tile-back" />
+      <span aria-hidden="true" className="wall-tile wall-tile-middle" />
+      <span aria-hidden="true" className="wall-tile wall-tile-front" />
+      <span className="wall-counter">Wall · {count}</span>
+    </div>
+  );
+}
+
+function RulesDialog({ onClose }: Readonly<{ onClose: () => void }>) {
+  return (
+    <TableDialog id="table-rules" onClose={onClose} title="How to play">
+      <ul className="dialog-list">
+        <li>When your card says Playing, choose one tile and select Discard selected.</li>
+        <li>
+          On another player&apos;s discard, choose Pass, Win, Pung, Kong, or Chow when that action
+          is available. Only the next seat may Chow.
+        </li>
+        <li>
+          Win with four sets and a pair, or seven distinct pairs. The table resolves competing
+          claims by win, then kong or pung, then chow.
+        </li>
+        <li>
+          The server shows the remaining time for each turn. A disconnected human seat is
+          temporarily played by a bot and returns to human control when it reconnects.
+        </li>
+      </ul>
+    </TableDialog>
+  );
+}
+
+function OpponentHandsDialog({
+  game,
+  onClose,
+}: Readonly<{
+  game: GameSnapshot;
+  onClose: () => void;
+}>) {
+  return (
+    <TableDialog id="opponent-hands" onClose={onClose} title="Other players’ hands">
+      <p className="dialog-intro">Hands are sorted by suit and rank after this hand only.</p>
+      <div className="opponent-hand-grid">
+        {game.players
+          .filter((player) => player.seat !== game.viewerSeat)
+          .map((player) => {
+            const tiles = [...(player.concealedTiles ?? [])].sort((left, right) => {
+              const typeDifference = tileTypeIndex(left.type) - tileTypeIndex(right.type);
+              return typeDifference === 0 ? left.id.localeCompare(right.id) : typeDifference;
+            });
+            return (
+              <article className={`opponent-hand seat-${String(player.seat)}`} key={player.seat}>
+                <strong>{playerNickname(player)}</strong>
+                <span>{seatName(player.seat)}</span>
+                <div
+                  aria-label={`${playerNickname(player)} concealed tiles`}
+                  className="opponent-hand-tiles"
+                >
+                  {tiles.map((tile) => (
+                    <TileArt key={tile.id} tile={tile} />
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+      </div>
+    </TableDialog>
+  );
+}
+
+function TableDialog({
+  children,
+  id,
+  onClose,
+  title,
+}: Readonly<{
+  children: ReactNode;
+  id: string;
+  onClose: () => void;
+  title: string;
+}>) {
+  const closeButton = useRef<HTMLButtonElement | null>(null);
+  const dialog = useRef<HTMLElement | null>(null);
+  const closeHandler = useRef(onClose);
+
+  useEffect(() => {
+    closeHandler.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const triggeringControl = document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
+    const returnFocus =
+      previouslyFocused?.getAttribute("aria-controls") === id
+        ? previouslyFocused
+        : (triggeringControl ?? previouslyFocused);
+    const applicationRoot = document.querySelector<HTMLElement>("#root");
+    const wasInert = applicationRoot?.inert ?? false;
+    if (applicationRoot !== null) applicationRoot.inert = true;
+    closeButton.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeHandler.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        dialog.current?.querySelectorAll<HTMLElement>(
+          [
+            "a[href]",
+            "button:not([disabled])",
+            "input:not([disabled])",
+            "select:not([disabled])",
+            "textarea:not([disabled])",
+            "[tabindex]:not([tabindex='-1'])",
+          ].join(","),
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.current?.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (applicationRoot !== null) applicationRoot.inert = wasInert;
+      returnFocus?.focus();
+    };
+  }, [id]);
+
+  return createPortal(
+    <div className="table-dialog-backdrop" onMouseDown={onClose}>
+      <section
+        aria-labelledby={`${id}-title`}
+        aria-modal="true"
+        className="table-dialog"
+        id={id}
+        onMouseDown={(event) => event.stopPropagation()}
+        ref={dialog}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <header className="table-dialog-header">
+          <h2 id={`${id}-title`}>{title}</h2>
+          <button aria-label={`Close ${title}`} onClick={onClose} ref={closeButton} type="button">
+            Close
+          </button>
+        </header>
+        {children}
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function initialPublicAction(game: GameSnapshot): string {
+  if (game.result?.kind === "win") return `${seatName(game.result.winner)} won the hand.`;
+  if (game.result?.kind === "draw") return "The wall is empty. This hand is a draw.";
+  if (game.pendingDiscard !== null)
+    return discardActionLabel(game, game.pendingDiscard.seat, game.pendingDiscard.tile.type);
+  if (game.pendingAddedKong !== null)
+    return `${playerNicknameForSeat(game, game.pendingAddedKong.seat)} proposed an added Kong.`;
+  if (game.activeSeat !== null)
+    return `${playerNicknameForSeat(game, game.activeSeat)} is choosing a discard.`;
+  return "Waiting for the table.";
+}
+
+function publicActionSince(previous: GameSnapshot, game: GameSnapshot): string | null {
+  if (previous.handId !== game.handId) return initialPublicAction(game);
+
+  const knownDiscardIds = new Set(
+    previous.players.flatMap((player) => player.discards.map((tile) => tile.id)),
+  );
+  for (const player of game.players) {
+    const newDiscard = player.discards.find((tile) => !knownDiscardIds.has(tile.id));
+    if (newDiscard !== undefined) return discardActionLabel(game, player.seat, newDiscard.type);
+  }
+
+  if (
+    game.pendingAddedKong !== null &&
+    game.pendingAddedKong.tile.id !== previous.pendingAddedKong?.tile.id
+  ) {
+    return `${playerNicknameForSeat(game, game.pendingAddedKong.seat)} proposed an added Kong.`;
+  }
+  if (previous.result === null && game.result !== null) return initialPublicAction(game);
+  if (game.activeSeat !== null && previous.activeSeat !== game.activeSeat)
+    return `${playerNicknameForSeat(game, game.activeSeat)} is choosing a discard.`;
+  return null;
+}
+
+function discardActionLabel(
+  game: GameSnapshot,
+  seat: number,
+  type: Parameters<typeof tileTypeName>[0],
+): string {
+  return `${playerNicknameForSeat(game, seat)} discarded ${tileTypeName(type)}.`;
+}
+
+function playerNicknameForSeat(game: GameSnapshot, seat: number): string {
+  const player = game.players.find((candidate) => candidate.seat === seat);
+  return player === undefined ? seatName(seat) : playerNickname(player);
+}
+
+function playerNickname(player: GameSnapshot["players"][number]): string {
+  return player.nickname ?? `Bot ${seatName(player.seat)}`;
 }
 
 function chowOptionLabel(game: GameSnapshot, tileIds: readonly string[]): string {
@@ -1326,7 +1682,17 @@ function ResultBanner({
   const result = game.result;
   if (result === null) return null;
   return (
-    <div className="result-banner">
+    <div className={`result-banner${result.kind === "win" ? " is-win" : ""}`}>
+      {result.kind === "win" ? (
+        <span aria-hidden="true" className="winner-celebration">
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+      ) : null}
       <div>
         <strong>{result.kind === "draw" ? "Draw hand" : `${seatName(result.winner)} wins`}</strong>
         <span>
@@ -1363,7 +1729,13 @@ function ResultBanner({
       >
         {canPlayAgain ? "Return to lobby" : "Waiting for host"}
       </button>
-      <button className="secondary" onClick={onToggleOpponentTiles} type="button">
+      <button
+        aria-controls="opponent-hands"
+        aria-expanded={showOpponentTiles}
+        className="secondary"
+        onClick={onToggleOpponentTiles}
+        type="button"
+      >
         {showOpponentTiles ? "Hide other hands" : "Show other hands"}
       </button>
     </div>

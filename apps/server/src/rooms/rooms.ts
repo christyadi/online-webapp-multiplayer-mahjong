@@ -750,6 +750,10 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
     deadline: room.deadline,
     decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
     dealer: hand.dealer,
+    drawnTileId:
+      hand.phase === "awaiting-discard" && hand.turn === viewerSeat
+        ? (hand.drawnTileId ?? null)
+        : null,
     handId: hand.handId,
     legalActions: legalActionsForSeat(hand, viewerSeat),
     pendingAddedKong,

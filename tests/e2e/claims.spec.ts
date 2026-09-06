@@ -2,7 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 
 test("a player chooses one Chow option and every player sees the exposed meld", async ({
   browser,
-}) => {
+}, testInfo) => {
   const contexts: BrowserContext[] = [];
   try {
     const host = await newGuestPage(browser, contexts);
@@ -16,7 +16,7 @@ test("a player chooses one Chow option and every player sees the exposed meld", 
     await friend.getByRole("button", { name: "I’m ready" }).click();
     await host.getByRole("button", { name: "I’m ready" }).click();
     await host.getByRole("button", { name: "Start hand" }).click();
-    await expect(host.getByRole("heading", { name: "Hand starting" })).toBeVisible();
+    await expect(host.getByRole("heading", { name: "Mahjong table" })).toBeAttached();
 
     await host.getByRole("button", { name: /Select 3 of dots/ }).click();
     await host.getByRole("button", { name: "Discard selected" }).click();
@@ -35,9 +35,23 @@ test("a player chooses one Chow option and every player sees the exposed meld", 
 
     await expect(friend.getByText("Playing · choose discard")).toBeVisible();
     await expect(friend.getByLabel("Claimant exposed melds")).toContainText("Chow");
+    if (testInfo.project.name.includes("phone")) {
+      await expect(friend.locator(".player-panel.seat-1 .meld-strip")).toBeVisible();
+      await expect(friend.locator(".player-panel.seat-1 .meld-summary")).toHaveText(
+        "2 of dots · 4 of dots · 3 of dots",
+      );
+      await expect(friend.locator(".player-panel.seat-1 .meld-summary")).toBeVisible();
+    }
     await expect(friend.locator(".player-panel.seat-1 .meld-tiles .tile-art")).toHaveCount(3);
     await expectExposedMiddleChow(friend);
     await expect(host.getByLabel("Claimant exposed melds")).toContainText("Chow");
+    if (testInfo.project.name.includes("phone")) {
+      await expect(host.locator(".player-panel.seat-1 .meld-strip")).toBeVisible();
+      await expect(host.locator(".player-panel.seat-1 .meld-summary")).toHaveText(
+        "2 of dots · 4 of dots · 3 of dots",
+      );
+      await expect(host.locator(".player-panel.seat-1 .meld-summary")).toBeVisible();
+    }
     await expect(host.locator(".player-panel.seat-1 .meld-tiles .tile-art")).toHaveCount(3);
     await expectExposedMiddleChow(host);
     await expect(friend.getByRole("alert")).toHaveCount(0);

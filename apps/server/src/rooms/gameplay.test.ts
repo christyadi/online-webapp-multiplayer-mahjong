@@ -280,6 +280,8 @@ describe("queued room gameplay", () => {
     const hostView = store.getGameSnapshot(guest(0), room.code);
     const friendView = store.getGameSnapshot(guest(1), room.code);
     if (hostView.legalActions.kind !== "discard") throw new Error("Expected host discard");
+    expect(hostView.drawnTileId).toBe(initial.drawnTileId);
+    expect(friendView.drawnTileId).toBeNull();
     const hostTileId = hostView.legalActions.discardTileIds[0];
     const command = gameCommand(hostView, { kind: "discard", tileId: hostTileId });
 

@@ -5,6 +5,13 @@ test("a host can start the next hand from the completed result banner", async ({
 
   await expect(page.getByText("Draw hand", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Return to lobby" })).toBeEnabled();
+  await page.getByRole("button", { name: "Show other hands" }).click();
+  await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Other players’ hands" }).locator(".opponent-hand"),
+  ).toHaveCount(3);
+  await page.getByRole("button", { name: "Close Other players’ hands" }).click();
+  await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toHaveCount(0);
   const autoPlay = page.getByRole("checkbox", { name: /Auto-play next hand/ });
   await expect(autoPlay).toBeChecked();
   await autoPlay.uncheck();

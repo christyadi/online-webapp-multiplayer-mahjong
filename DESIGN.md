@@ -2,6 +2,16 @@
 
 This document adapts the supplied `mahjong-game-page.html`, `mahjong-landing-page.html`, `mahjong-tile-concept.html`, and `design-system.md` references into the existing Mahjong Together product. The references are visual direction, not executable implementation instructions. Their external font imports, Unicode tile rendering, audio effects, and marketing-only copy are intentionally excluded where they conflict with the product specification.
 
+## Implemented direction (2026-09-07)
+
+- The table now uses a continuous shaded felt plane, framed by a compact wood HUD and a lower wood interaction dock. Brass is limited to dealer/wind markers, wall context, active state, and result emphasis.
+- The existing local SVG tiles now render with an ivory face, warm bevel, highlight, woven green back, drawn-tile separation, and perspective-preserving selection lift. The server reveals a drawn-tile ID only to its current owner.
+- The middle is a stable central pond with a physical wall stack, an explicit first-discard empty state, and a seat-color legend. The latest public discard remains in readable status text and uses restrained motion when motion is allowed.
+- The gameplay HUD replaces the previous generic title with room/seat context, dealer marker, accessible question-mark rules dialog, current action, and active-seat countdown. End-hand opponent tiles open in a dialog rather than reflowing the table.
+- A restrained six-piece winner treatment stays inside the result banner. All non-essential animations are opt-in through `prefers-reduced-motion: no-preference`.
+- Public exposed melds remain visible in compact, horizontally scrollable strips at phone portrait and landscape sizes, pairing their physical tiles with readable names; responsive compaction never removes game information.
+- Rules and end-hand dialogs are portaled above the app, inert the background, trap Tab focus, close with Escape, and restore their owning control. Local tiles support mouse drag, a dedicated non-scrolling touch drag grip, and a keyboard select-and-move pattern.
+
 ## Purpose and tone
 
 Mahjong Together should feel like sitting down at a cared-for physical table: tactile, calm, traditional, and easy to scan during a live hand. The table is the product, not a dashboard made from unrelated cards. Use one strong visual gesture per screen and reserve high-attention accents for the current action, important CTA, or result.
@@ -56,8 +66,10 @@ The supplied landing reference suggests a wood frame, felt hero, one oversized t
 ## Accessibility and responsive acceptance
 
 - Keep controls at least 44×44 CSS pixels and use semantic buttons/labels.
+- Keep dialog focus inside the open overlay, make the application behind it inert, restore the trigger on close, and retain Escape plus an explicit close control.
 - Pair every color or animation cue with readable text or an accessible announcement.
 - Maintain clear focus outlines in both themes and keep tile labels available to assistive technology.
+- Keep public meld information visible and readable at all supported breakpoints; pair compact artwork with tile-name summaries and bounded horizontal scrolling instead of concealing it.
 - The normal turn should fit without page scrolling at desktop, tablet, and both phone orientations. Only intentionally long hand/discard collections may scroll inside their own regions.
 - Verify the composition at 1440×900, iPad Pro 11, 390×844, and 844×390.
 

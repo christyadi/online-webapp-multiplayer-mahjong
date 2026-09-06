@@ -7,6 +7,7 @@ test("a winning result identifies the dealer, source, and complete winning combi
 
   await expect(page.getByText("East wins", { exact: true })).toBeVisible();
   await expect(page.getByText("Win by self draw.", { exact: true })).toBeVisible();
+  await expect(page.locator(".winner-celebration i")).toHaveCount(6);
   const combination = page.getByLabel("Winning combination");
   await expect(combination).toBeVisible();
   await expect(combination.locator(".tile-art")).toHaveCount(14);

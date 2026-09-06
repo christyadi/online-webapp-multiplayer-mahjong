@@ -61,8 +61,10 @@ export function TileArt({ tile, selected = false, onClick }: TileArtProperties) 
       viewBox="0 0 64 88"
     >
       <title>{label}</title>
-      <rect className="tile-shadow" height="84" rx="6" width="58" x="4" y="4" />
-      <rect className="tile-face" height="80" rx="5" width="54" x="3" y="2" />
+      <rect className="tile-shadow" height="82" rx="7" width="58" x="4" y="5" />
+      <rect className="tile-edge" height="80" rx="6" width="56" x="3" y="2" />
+      <rect className="tile-face" height="76" rx="4" width="52" x="5" y="4" />
+      <path className="tile-shine" d="M10 8h40" />
       <text className="tile-rank" x="8" y="14">
         {details?.rank ?? ""}
       </text>

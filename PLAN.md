@@ -4,8 +4,8 @@
 
 Visual-design and UX refinement are the active priorities. Public deployment is intentionally deferred: after the design direction and plan are complete, the user will manually configure Render. Do not start a Render service, request provider access, or perform public-service verification during the current refinement work.
 
-- [ ] Complete the unchecked visual-direction and UX-refinement work below.
-- [ ] Verify the completed experience across the required viewports and assistive paths.
+- [x] Complete the visual-direction and UX-refinement work below.
+- [x] Verify the completed experience across the required viewports and assistive paths.
 - [ ] Hand off the preserved deployment configuration to the user for manual setup.
 - [ ] Resume public-service verification only after the user provides a deployed URL.
 
@@ -57,25 +57,29 @@ Visual-design and UX refinement are the active priorities. Public deployment is 
 
 The attached HTML concepts and design-system note are recorded in [DESIGN.md](./DESIGN.md). Their visual principles are planned follow-up work; their external fonts, Unicode glyph implementation, audio, and demo scripts are explicitly out of scope.
 
-- [ ] Rework the gameplay surface toward one continuous felt plane with restrained wood HUD/rack framing, a scarce brass hierarchy accent, and dark-mode equivalents that preserve contrast.
-- [ ] Refine tile rendering as a physical object: consistent ivory bevel/depth, distinct woven back, perspective-preserving selected state, separated drawn tile, and stable small/medium/large proportions using the existing local SVG assets.
-- [ ] Refine spatial hierarchy into top/side opponents, physical wall treatment, central discard pond, and lower local rack/action dock. Keep the pond stable, explain its empty state, and retain an owner-color legend.
-- [ ] Add a readable latest public-action cue and an accessible live-region announcement. Use restrained origin-to-pond discard motion and an active-seat timer/glow that remain clear with reduced motion disabled.
-- [ ] Add a restrained winner celebration tied to the result banner without obscuring tiles or controls, with a static reduced-motion fallback.
-- [ ] Apply the landing reference selectively: wood frame, felt hero, one oversized tile gesture, ivory material/suit accents, and brass CTA hierarchy, while keeping create/join as the primary first-viewport workflow.
-- [ ] Verify the material, hierarchy, dark mode, keyboard/touch reachability, and normal-turn no-scroll behavior at 1440×900, iPad Pro 11, 390×844, and 844×390.
+- [x] Rework the gameplay surface toward one continuous felt plane with restrained wood HUD/rack framing, a scarce brass hierarchy accent, and dark-mode equivalents that preserve contrast.
+- [x] Refine tile rendering as a physical object: consistent ivory bevel/depth, distinct woven back, perspective-preserving selected state, separated drawn tile, and stable small/medium/large proportions using the existing local SVG assets.
+- [x] Refine spatial hierarchy into top/side opponents, physical wall treatment, central discard pond, and lower local rack/action dock. Keep the pond stable, explain its empty state, and retain an owner-color legend.
+- [x] Add a readable latest public-action cue and an accessible live-region announcement. Use restrained origin-to-pond discard motion and an active-seat timer/glow that remain clear with reduced motion disabled.
+- [x] Add a restrained winner celebration tied to the result banner without obscuring tiles or controls, with a static reduced-motion fallback.
+- [x] Apply the landing reference selectively: wood frame, felt hero, one oversized tile gesture, ivory material/suit accents, and brass CTA hierarchy, while keeping create/join as the primary first-viewport workflow.
+- [x] Verify the material, hierarchy, dark mode, keyboard/touch reachability, and normal-turn no-scroll behavior at 1440×900, iPad Pro 11, 390×844, and 844×390.
+- [x] Preserve exposed melds in a compact, horizontally scrollable strip at both phone orientations, with readable text summaries of the tile names; never hide public Chow, Pung, or Kong information to save space.
+- [x] Make rules and end-hand inspection true keyboard dialogs: mount above the application surface, make background controls inert, contain Tab focus, support Escape, and restore the owning control on close.
+- [x] Keep every interactive control at least 44×44 CSS pixels at touch breakpoints. Compress tile artwork and permit only intentional internal scrolling rather than shrinking targets.
+- [x] Support hand reordering with mouse drag, a dedicated non-scrolling touch drag grip, and keyboard selection plus adjacent move controls; retain a concise visible affordance.
 
 ## Future UX refinement backlog (captured 2026-09-06)
 
-These are planned follow-up improvements from the latest player review. They are intentionally unchecked and do not change the completed gameplay milestone.
+These player-review improvements were resolved as part of the completed visual refinement. They remain here as acceptance history for later changes.
 
-- [ ] Replace the persistent **How to play** disclosure with a circular question-mark icon button. Open the rules in a desktop popover or mobile bottom sheet, keep it closed by default, and provide an accessible name, keyboard focus handling, Escape-to-close, and a visible close action.
-- [ ] Remove the visible **Hand starting · Mahjong table** heading during gameplay. Retain a visually hidden semantic heading if needed, and move only useful context (room code, seat, connection, wall count, and turn timer) into a compact utility bar.
-- [ ] Rebalance the table composition so the felt has a stable aspect ratio and predictable footprint, uses less outer whitespace, and keeps the central discard pool visually dominant without stretching or collapsing between turns.
-- [ ] Add a clear central empty state (for example, **Waiting for the first discard**) and a compact legend explaining discard ownership colors so the middle never feels unexplained or empty.
-- [ ] Consolidate the local player card, hand rack, and legal actions into one bottom interaction dock. Keep the hand primary, show action buttons only when available, and reduce persistent drag/sort guidance to a compact affordance.
-- [ ] Improve player-card hierarchy with prominent text status, a strong active border/glow, and a timer/progress treatment. Color remains a secondary cue and is never the only way to identify the active player.
-- [ ] Make turn ownership immediately legible with a persistent text label, high-contrast animated active-seat treatment, and a short public action cue such as **West discarded 5 of bamboo**. Animate a discard from the player edge into the central pool, keep the latest action visible long enough to read, and provide an equivalent live-region announcement; disable motion under `prefers-reduced-motion`.
-- [ ] Add a restrained winner celebration (confetti or equivalent) when a hand ends. Tie it to the winner and result banner, keep controls usable, avoid obscuring tiles, and provide a reduced-motion/static fallback.
-- [ ] Keep end-of-hand opponent-hand inspection in an overlay or expandable panel so revealing hands does not resize the table or push the local hand and controls out of view.
-- [ ] Verify the revised hierarchy at 1440×900, iPad Pro 11, 390×844, and 844×390. The normal turn must fit without page scrolling; only intentionally long hand/discard collections may scroll inside their own regions.
+- [x] Replace the persistent **How to play** disclosure with a circular question-mark icon button. Open the rules in a desktop popover or mobile bottom sheet, keep it closed by default, and provide an accessible name, keyboard focus handling, Escape-to-close, and a visible close action.
+- [x] Remove the visible **Hand starting · Mahjong table** heading during gameplay. Retain a visually hidden semantic heading if needed, and move only useful context (room code, seat, connection, wall count, and turn timer) into a compact utility bar.
+- [x] Rebalance the table composition so the felt has a stable aspect ratio and predictable footprint, uses less outer whitespace, and keeps the central discard pool visually dominant without stretching or collapsing between turns.
+- [x] Add a clear central empty state (for example, **Waiting for the first discard**) and a compact legend explaining discard ownership colors so the middle never feels unexplained or empty.
+- [x] Consolidate the local player card, hand rack, and legal actions into one bottom interaction dock. Keep the hand primary, show action buttons only when available, and reduce persistent drag/sort guidance to a compact affordance.
+- [x] Improve player-card hierarchy with prominent text status, a strong active border/glow, and a timer/progress treatment. Color remains a secondary cue and is never the only way to identify the active player.
+- [x] Make turn ownership immediately legible with a persistent text label, high-contrast animated active-seat treatment, and a short public action cue such as **West discarded 5 of bamboo**. Animate a discard from the player edge into the central pool, keep the latest action visible long enough to read, and provide an equivalent live-region announcement; disable motion under `prefers-reduced-motion`.
+- [x] Add a restrained winner celebration (confetti or equivalent) when a hand ends. Tie it to the winner and result banner, keep controls usable, avoid obscuring tiles, and provide a reduced-motion/static fallback.
+- [x] Keep end-of-hand opponent-hand inspection in an overlay or expandable panel so revealing hands does not resize the table or push the local hand and controls out of view.
+- [x] Verify the revised hierarchy at 1440×900, iPad Pro 11, 390×844, and 844×390. The normal turn must fit without page scrolling; only intentionally long hand/discard collections may scroll inside their own regions.
