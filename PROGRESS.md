@@ -192,6 +192,8 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Refined the end-of-hand reveal so the viewer's own lower rack remains the single source of their tiles; “Show other hands” now affects opponents only.
 - Added a deterministic `Sort hand` button using Mahjong tile order with stable physical-tile tie breaks, clearing the current selection after sorting.
 - Added a visible “Drag tiles to reorder” hint and a subtle grip affordance on each draggable tile while preserving native drag behavior.
+- Tightened the desktop felt to a centered, compact board and enlarged opponent card/tile proportions so end-of-hand hands are easier to inspect without changing the full-screen shell.
+- Revealed opponent concealed tiles are now sorted by Mahjong type with stable physical-tile ID tie breaks; the viewer's lower rack behavior is unchanged.
 
 ## Next exact step
 

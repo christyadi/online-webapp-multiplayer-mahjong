@@ -150,15 +150,19 @@ a {
 .table-felt {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(8rem, 13rem) minmax(0, 1fr) minmax(8rem, 13rem);
-  grid-template-rows: auto minmax(15rem, 1fr) auto;
+  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr) minmax(13rem, 17rem);
+  grid-template-rows: auto minmax(12rem, 1fr) auto;
   grid-template-areas:
     ". north ."
     "west center east"
     ". south .";
   gap: clamp(0.5rem, 1.5vw, 1rem);
   min-height: 0;
+  max-width: 80rem;
+  max-height: min(74dvh, 52rem);
   height: 100%;
+  align-self: center;
+  justify-self: center;
   margin-top: 1.25rem;
   border: 0.5rem solid #285d4c;
   border-radius: 1rem;
@@ -188,7 +192,7 @@ a {
   min-width: 0;
   border: 2px solid transparent;
   border-radius: 0.7rem;
-  padding: 0.65rem;
+  padding: 0.9rem;
   background: rgb(9 48 37 / 40%);
 }
 .player-panel.seat-0 {
@@ -245,10 +249,11 @@ a {
   flex-wrap: wrap;
   gap: 0.18rem;
   margin-top: 0.5rem;
+  align-content: start;
 }
 .opponent-tiles .tile-art {
-  width: 1.2rem;
-  height: 1.7rem;
+  width: 1.55rem;
+  height: 2.15rem;
 }
 .meld-strip {
   display: flex;
@@ -281,8 +286,8 @@ a {
 }
 .tile-back {
   display: block;
-  width: 1.05rem;
-  height: 1.35rem;
+  width: 1.35rem;
+  height: 1.8rem;
   border: 1px solid #d9c38b;
   border-radius: 0.2rem;
   background: repeating-linear-gradient(135deg, #d0a84c 0 3px, #f4df9a 3px 5px);
@@ -665,6 +670,9 @@ p {
       "south";
     min-height: auto;
     height: auto;
+    max-width: none;
+    max-height: none;
+    width: 100%;
   }
   .table-shell {
     min-height: 100dvh;

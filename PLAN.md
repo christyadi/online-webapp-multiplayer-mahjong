@@ -26,3 +26,5 @@
 - [x] Keep the viewer's hand in one lower rack; the results toggle reveals opponents only, never a duplicate viewer hand.
 - [x] Add a deterministic Sort hand control for the viewer's concealed tiles.
 - [x] Add a visible drag-to-reorder hint and tile grip affordance beside the hand controls.
+- [x] Keep the felt compact within the full-screen shell while giving opponent cards more room for inspection.
+- [x] Sort revealed opponent concealed tiles by Mahjong type and stable physical-tile ID at hand end.

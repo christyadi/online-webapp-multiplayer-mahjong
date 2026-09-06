@@ -779,6 +779,10 @@ function PlayerPanel({
 }>) {
   const isViewer = player.seat === game.viewerSeat;
   const showTiles = !isViewer && game.phase === "hand-ended" && showOpponentTiles;
+  const revealedTiles = [...(player.concealedTiles ?? [])].sort((left, right) => {
+    const typeDifference = tileTypeIndex(left.type) - tileTypeIndex(right.type);
+    return typeDifference === 0 ? left.id.localeCompare(right.id) : typeDifference;
+  });
   const status = playerStatus(game, player.seat);
   return (
     <article
@@ -805,7 +809,7 @@ function PlayerPanel({
           }
         >
           {showTiles
-            ? (player.concealedTiles ?? []).map((tile) => <TileArt key={tile.id} tile={tile} />)
+            ? revealedTiles.map((tile) => <TileArt key={tile.id} tile={tile} />)
             : Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
                 <span className="tile-back" key={index} />
               ))}
