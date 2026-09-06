@@ -389,19 +389,6 @@ function Lobby({
   const viewerIsHost = viewer?.kind === "human" && viewer.host;
   const inviteUrl = `${window.location.origin}/room/${room.code}`;
 
-  if (room.phase === "active" && game !== null) {
-    return (
-      <Table
-        error={error}
-        game={game}
-        onError={onError}
-        onLeave={onLeave}
-        realtime={realtime}
-        room={room}
-      />
-    );
-  }
-
   const mutate = async (path: string, body: Record<string, unknown>) => {
     setPending(true);
     onError(null);
@@ -419,6 +406,40 @@ function Lobby({
       setPending(false);
     }
   };
+
+  const leaveGame = () => {
+    if (room.phase === "active" && !window.confirm("Leave this hand and give your seat to a bot?"))
+      return;
+    onInvalidateRoomRequests();
+    setPending(true);
+    void requestJson(`/api/rooms/${room.code}/leave`, undefined, {
+      body: JSON.stringify({ commandId: crypto.randomUUID() }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    })
+      .then(onLeave)
+      .catch((caught: unknown) => {
+        if (isRoomExpiredError(caught)) onExpired();
+        else onError(errorMessage(caught));
+      })
+      .finally(() => setPending(false));
+  };
+
+  if (room.phase === "active" && game !== null) {
+    return (
+      <Table
+        error={error}
+        game={game}
+        canPlayAgain={viewerIsHost}
+        onError={onError}
+        onLeave={leaveGame}
+        onPlayAgain={() => void mutate(`/api/rooms/${room.code}/start`, {})}
+        pending={pending}
+        realtime={realtime}
+        room={room}
+      />
+    );
+  }
 
   const copyInvite = async () => {
     try {
@@ -511,31 +532,7 @@ function Lobby({
           {manualCopy ? <input aria-label="Invite link" readOnly value={inviteUrl} /> : null}
         </div>
 
-        <button
-          className="text-button"
-          disabled={pending}
-          onClick={() => {
-            if (
-              room.phase === "active" &&
-              !window.confirm("Leave this hand and give your seat to a bot?")
-            )
-              return;
-            onInvalidateRoomRequests();
-            setPending(true);
-            void requestJson(`/api/rooms/${room.code}/leave`, undefined, {
-              body: JSON.stringify({ commandId: crypto.randomUUID() }),
-              headers: { "content-type": "application/json" },
-              method: "POST",
-            })
-              .then(onLeave)
-              .catch((caught: unknown) => {
-                if (isRoomExpiredError(caught)) onExpired();
-                else onError(errorMessage(caught));
-              })
-              .finally(() => setPending(false));
-          }}
-          type="button"
-        >
+        <button className="text-button" disabled={pending} onClick={leaveGame} type="button">
           Leave game
         </button>
         {error === null ? null : (
@@ -560,15 +557,28 @@ function StatusCard({ title, message }: Readonly<{ message: string; title: strin
 }
 
 type TableProperties = Readonly<{
+  canPlayAgain: boolean;
   error: string | null;
   game: GameSnapshot;
   onError: (message: string | null) => void;
   onLeave: () => void;
+  onPlayAgain: () => void;
+  pending: boolean;
   realtime: Socket | null;
   room: RoomView;
 }>;
 
-function Table({ error, game, onError, onLeave, realtime, room }: TableProperties) {
+function Table({
+  canPlayAgain,
+  error,
+  game,
+  onError,
+  onLeave,
+  onPlayAgain,
+  pending,
+  realtime,
+  room,
+}: TableProperties) {
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
@@ -737,8 +747,11 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
 
         {game.result === null ? null : (
           <ResultBanner
+            canPlayAgain={canPlayAgain}
             game={game}
             onToggleOpponentTiles={() => setShowOpponentTiles((visible) => !visible)}
+            onPlayAgain={onPlayAgain}
+            pending={pending}
             showOpponentTiles={showOpponentTiles}
           />
         )}
@@ -1009,12 +1022,18 @@ function ActionBar({
 }
 
 function ResultBanner({
+  canPlayAgain,
   game,
   onToggleOpponentTiles,
+  onPlayAgain,
+  pending,
   showOpponentTiles,
 }: Readonly<{
+  canPlayAgain: boolean;
   game: GameSnapshot;
   onToggleOpponentTiles: () => void;
+  onPlayAgain: () => void;
+  pending: boolean;
   showOpponentTiles: boolean;
 }>) {
   const result = game.result;
@@ -1029,6 +1048,14 @@ function ResultBanner({
             : `Win by ${result.source.replaceAll("-", " ")}.`}
         </span>
       </div>
+      <button
+        className="secondary"
+        disabled={!canPlayAgain || pending}
+        onClick={onPlayAgain}
+        type="button"
+      >
+        {canPlayAgain ? (pending ? "Starting…" : "Play again") : "Waiting for host"}
+      </button>
       <button className="secondary" onClick={onToggleOpponentTiles} type="button">
         {showOpponentTiles ? "Hide other hands" : "Show other hands"}
       </button>

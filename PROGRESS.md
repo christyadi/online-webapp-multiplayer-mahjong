@@ -194,6 +194,9 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Added a visible “Drag tiles to reorder” hint and a subtle grip affordance on each draggable tile while preserving native drag behavior.
 - Tightened the desktop felt to a centered, compact board and enlarged opponent card/tile proportions so end-of-hand hands are easier to inspect without changing the full-screen shell.
 - Revealed opponent concealed tiles are now sorted by Mahjong type with stable physical-tile ID tie breaks; the viewer's lower rack behavior is unchanged.
+- Fixed active-table leave to execute the server leave mutation before returning home, releasing the guest for immediate room creation.
+- Added a host-only `Play again` control on the result banner; rematches create a fresh hand and rotate the dealer while preserving the room and seats.
+- Added regressions for active-hand leave/new-room recovery and server-side rematch behavior.
 
 ## Next exact step
 

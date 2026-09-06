@@ -95,6 +95,20 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
   }
 });
 
+test("leaving an active hand releases the guest for a new room", async ({ page }) => {
+  await page.goto("/");
+  await createRoom(page, "Host");
+  await page.getByRole("button", { name: "I’m ready" }).click();
+  await page.getByRole("button", { name: "Start hand" }).click();
+  await expect(page.getByRole("heading", { name: "Hand starting" })).toBeVisible();
+
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Leave game" }).click();
+  await expect(page.getByRole("heading", { name: "Mahjong Together" })).toBeVisible();
+
+  await createRoom(page, "New host");
+});
+
 test("a delayed join refresh cannot resurrect a room after a newer clear", async ({ browser }) => {
   const contexts: BrowserContext[] = [];
   try {

@@ -12,6 +12,7 @@ import {
 import { chooseBotAction } from "../game/bot.js";
 import {
   legalActionsForSeat,
+  rotateDealer,
   startHand,
   transition,
   type HandAction,
@@ -185,7 +186,10 @@ export class RoomStore {
   start(session: GuestSession, code: string): RoomView {
     this.cleanupExpired();
     const { room, seat } = this.requireHumanMembership(session.guestId, code);
-    if (room.phase !== "lobby") throw new RoomError("room-active", "The hand has started");
+    const previousHand = room.hand;
+    const rematch = room.phase === "active" && previousHand?.phase === "hand-ended";
+    if (room.phase !== "lobby" && !rematch)
+      throw new RoomError("room-active", "The hand has started");
     if (!seat.host) throw new RoomError("host-only", "Only the host can start the hand");
     const humans = room.seats.filter(
       (occupant): occupant is HumanSeat => occupant?.kind === "human",
@@ -196,11 +200,15 @@ export class RoomStore {
     for (const seatIndex of [0, 1, 2, 3] as const) {
       room.seats[seatIndex] ??= { kind: "bot" };
     }
-    const dealerIndex = room.seats.findIndex(
-      (occupant) => occupant?.kind === "human" && occupant.host,
-    );
-    if (dealerIndex === -1) throw new Error("Lobby host invariant failed");
-    const dealer = dealerIndex as SeatIndex;
+    const dealer = rematch
+      ? rotateDealer(previousHand.dealer)
+      : (() => {
+          const dealerIndex = room.seats.findIndex(
+            (occupant) => occupant?.kind === "human" && occupant.host,
+          );
+          if (dealerIndex === -1) throw new Error("Lobby host invariant failed");
+          return dealerIndex as SeatIndex;
+        })();
     room.hand = this.#handFactory(dealer);
     room.phase = "active";
     room.lastActivityAt = this.#clock();

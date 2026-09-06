@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { startHand, type HandEndedState } from "../game/state.js";
+import { createTileSet } from "../game/wall.js";
 import type { GuestSession } from "../identity/sessions.js";
 import { RoomError, RoomStore } from "./rooms.js";
 
@@ -52,6 +54,35 @@ describe("room lobby", () => {
     expect(() => store.join(guest(3), room.code, "Late")).toThrow(
       expect.objectContaining({ code: "room-active" }),
     );
+  });
+
+  it("lets the host start a rematch after the hand ends and rotates the dealer", () => {
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000001", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    let handCount = 0;
+    const store = new RoomStore({
+      codeFactory: () => "rematch00001",
+      handFactory: (dealer) => {
+        handCount += 1;
+        return handCount === 1
+          ? structuredClone(ended)
+          : startHand("00000000-0000-4000-8000-000000000002", dealer, createTileSet());
+      },
+    });
+    const room = store.create(guest(1), "Host");
+    store.setReady(guest(1), room.code, true);
+    store.start(guest(1), room.code);
+    expect(store.getGameSnapshot(guest(1), room.code).phase).toBe("hand-ended");
+
+    const rematch = store.start(guest(1), room.code);
+    expect(rematch.phase).toBe("active");
+    expect(store.getGameSnapshot(guest(1), room.code)).toMatchObject({
+      activeSeat: 1,
+      phase: "awaiting-discard",
+    });
   });
 
   it("transfers lobby hosting to the longest-present connected human", () => {

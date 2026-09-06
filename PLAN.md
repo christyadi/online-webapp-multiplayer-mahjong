@@ -28,3 +28,5 @@
 - [x] Add a visible drag-to-reorder hint and tile grip affordance beside the hand controls.
 - [x] Keep the felt compact within the full-screen shell while giving opponent cards more room for inspection.
 - [x] Sort revealed opponent concealed tiles by Mahjong type and stable physical-tile ID at hand end.
+- [x] Make leaving an active hand release the guest session so a new room can be created immediately.
+- [x] Add a host-only Play again action that starts a fresh hand after hand completion.
