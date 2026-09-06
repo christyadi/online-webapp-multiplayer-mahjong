@@ -1,48 +1,68 @@
 import {
   apiErrorSchema,
   currentRoomResponseSchema,
+  gameSnapshotSchema,
+  lobbyMutationAcknowledgementSchema,
   roomCodeSchema,
-  roomViewSchema,
+  type GameSnapshot,
   type RoomView,
 } from "@mahjong-together/shared";
 import { StrictMode, useCallback, useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { createRoot } from "react-dom/client";
+import { io, type Socket } from "socket.io-client";
 
+import { LatestRequestGate } from "./request-gate.js";
+import { ServerStateProvider, useServerState } from "./server-state.js";
 import "./styles.css";
 
+const controllerId = crypto.randomUUID();
+
 function App() {
+  const { dispatch, state: serverState } = useServerState();
+  const { game, room } = serverState;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [path, setPath] = useState(window.location.pathname);
   const [pending, setPending] = useState(false);
-  const [room, setRoom] = useState<RoomView | null>(null);
   const [roomExpired, setRoomExpired] = useState(false);
   const occupiedRoomCode = useRef<string | null>(null);
+  const roomRequests = useRef(new LatestRequestGate());
+  const realtime = useRef<Socket | null>(null);
+  const [realtimeReady, setRealtimeReady] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
 
   const navigate = useCallback((nextPath: string) => {
     window.history.pushState({}, "", nextPath);
     setPath(nextPath);
   }, []);
 
-  const acceptRoom = useCallback((nextRoom: RoomView) => {
-    occupiedRoomCode.current = nextRoom.code;
-    setRoomExpired(false);
-    setRoom(nextRoom);
-  }, []);
+  const acceptRoom = useCallback(
+    (nextRoom: RoomView) => {
+      roomRequests.current.invalidate();
+      occupiedRoomCode.current = nextRoom.code;
+      setRoomExpired(false);
+      dispatch({ room: nextRoom, type: "room-received" });
+      realtime.current?.emit("room:watch", () => undefined);
+    },
+    [dispatch],
+  );
 
   const expireRoom = useCallback(() => {
+    roomRequests.current.invalidate();
     occupiedRoomCode.current = null;
-    setRoom(null);
+    dispatch({ type: "room-cleared" });
     setRoomExpired(true);
     window.history.replaceState({}, "", "/");
     setPath("/");
-  }, []);
+  }, [dispatch]);
 
   const refreshRoom = useCallback(async () => {
+    const requestGeneration = roomRequests.current.begin();
     const current = await requestJson("/api/rooms/current", currentRoomResponseSchema);
+    if (!roomRequests.current.isCurrent(requestGeneration)) return;
     if (current.room === null) {
       if (occupiedRoomCode.current !== null) expireRoom();
-      else setRoom(null);
+      else dispatch({ type: "room-cleared" });
       return;
     }
     acceptRoom(current.room);
@@ -50,12 +70,13 @@ function App() {
       window.history.replaceState({}, "", `/room/${current.room.code}`);
       setPath(`/room/${current.room.code}`);
     }
-  }, [acceptRoom, expireRoom]);
+  }, [acceptRoom, dispatch, expireRoom]);
 
   useEffect(() => {
     const initialize = async () => {
       try {
         await requestJson("/api/session", undefined, { method: "POST" });
+        setSessionReady(true);
         await refreshRoom();
       } catch (caught) {
         setError(errorMessage(caught));
@@ -65,6 +86,40 @@ function App() {
     };
     void initialize();
   }, [refreshRoom]);
+
+  useEffect(() => {
+    if (!sessionReady) return;
+    const socket = io({
+      ackTimeout: 5_000,
+      auth: { controllerId },
+      autoConnect: false,
+      retries: 2,
+    });
+    realtime.current = socket;
+    socket.on("connect", () => {
+      setRealtimeReady(true);
+      setError(null);
+    });
+    socket.on("disconnect", () => setRealtimeReady(false));
+    socket.on("connect_error", (caught) => setError(errorMessage(caught)));
+    socket.on("room:changed", () => {
+      void refreshRoom().catch((caught: unknown) => setError(errorMessage(caught)));
+    });
+    socket.on("game:snapshot", (input: unknown) => {
+      const snapshot = gameSnapshotSchema.safeParse(input);
+      if (!snapshot.success) return;
+      dispatch({ snapshot: snapshot.data, type: "game-received" });
+    });
+    socket.on("session:replaced", () => {
+      setError("This room is now controlled from another tab. Reload to take control here.");
+      setRealtimeReady(false);
+    });
+    socket.connect();
+    return () => {
+      if (realtime.current === socket) realtime.current = null;
+      socket.disconnect();
+    };
+  }, [dispatch, refreshRoom, sessionReady]);
 
   useEffect(() => {
     const handleNavigation = () => setPath(window.location.pathname);
@@ -81,6 +136,24 @@ function App() {
 
   if (loading)
     return <StatusCard title="Opening the table…" message="Starting your guest session." />;
+
+  if (!sessionReady) {
+    return (
+      <StatusCard
+        title="Unable to open the table"
+        message={error ?? "A guest session could not be started."}
+      />
+    );
+  }
+
+  if (!realtimeReady) {
+    return (
+      <StatusCard
+        title={error === null ? "Connecting to the table…" : "Table control unavailable"}
+        message={error ?? "Establishing the secure live connection."}
+      />
+    );
+  }
 
   if (roomExpired) {
     return (
@@ -104,14 +177,16 @@ function App() {
         onError={setError}
         onExpired={expireRoom}
         onLeave={() => {
+          roomRequests.current.invalidate();
           occupiedRoomCode.current = null;
-          setRoom(null);
+          dispatch({ type: "room-cleared" });
           setRoomExpired(false);
           navigate("/");
         }}
+        onInvalidateRoomRequests={() => roomRequests.current.invalidate()}
         onRefresh={refreshRoom}
-        onRoom={acceptRoom}
         pending={pending}
+        game={game}
         room={room}
         setPending={setPending}
       />
@@ -124,10 +199,8 @@ function App() {
       <JoinRoom
         code={inviteCode}
         error={error}
-        onJoined={(joined) => {
-          acceptRoom(joined);
-          navigate(`/room/${joined.code}`);
-        }}
+        onJoined={refreshRoom}
+        onMutationStart={() => roomRequests.current.invalidate()}
         pending={pending}
         setError={setError}
         setPending={setPending}
@@ -146,16 +219,17 @@ function App() {
           disabled={pending}
           error={error}
           onSubmit={async (nickname) => {
+            roomRequests.current.invalidate();
             setPending(true);
             setError(null);
             try {
-              const created = await requestJson("/api/rooms", roomViewSchema, {
+              const created = await requestJson("/api/rooms", lobbyMutationAcknowledgementSchema, {
                 body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
                 headers: { "content-type": "application/json" },
                 method: "POST",
               });
-              acceptRoom(created);
-              navigate(`/room/${created.code}`);
+              navigate(`/room/${created.roomCode}`);
+              await refreshRoom();
             } catch (caught) {
               setError(errorMessage(caught));
             } finally {
@@ -172,13 +246,22 @@ function App() {
 type JoinRoomProperties = Readonly<{
   code: string;
   error: string | null;
-  onJoined: (room: RoomView) => void;
+  onJoined: () => Promise<void>;
+  onMutationStart: () => void;
   pending: boolean;
   setError: (message: string | null) => void;
   setPending: (pending: boolean) => void;
 }>;
 
-function JoinRoom({ code, error, onJoined, pending, setError, setPending }: JoinRoomProperties) {
+function JoinRoom({
+  code,
+  error,
+  onJoined,
+  onMutationStart,
+  pending,
+  setError,
+  setPending,
+}: JoinRoomProperties) {
   const validCode = roomCodeSchema.safeParse(code).success;
   return (
     <main>
@@ -195,15 +278,16 @@ function JoinRoom({ code, error, onJoined, pending, setError, setPending }: Join
               disabled={pending}
               error={error}
               onSubmit={async (nickname) => {
+                onMutationStart();
                 setPending(true);
                 setError(null);
                 try {
-                  const joined = await requestJson(`/api/rooms/${code}/join`, roomViewSchema, {
+                  await requestJson(`/api/rooms/${code}/join`, lobbyMutationAcknowledgementSchema, {
                     body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
                     headers: { "content-type": "application/json" },
                     method: "POST",
                   });
-                  onJoined(joined);
+                  await onJoined();
                 } catch (caught) {
                   setError(errorMessage(caught));
                 } finally {
@@ -262,11 +346,12 @@ function NicknameForm({ buttonLabel, disabled, error, onSubmit }: NicknameFormPr
 
 type LobbyProperties = Readonly<{
   error: string | null;
+  game: GameSnapshot | null;
   onError: (message: string | null) => void;
   onExpired: () => void;
   onLeave: () => void;
+  onInvalidateRoomRequests: () => void;
   onRefresh: () => Promise<void>;
-  onRoom: (room: RoomView) => void;
   pending: boolean;
   room: RoomView;
   setPending: (pending: boolean) => void;
@@ -274,11 +359,12 @@ type LobbyProperties = Readonly<{
 
 function Lobby({
   error,
+  game,
   onError,
   onExpired,
   onLeave,
+  onInvalidateRoomRequests,
   onRefresh,
-  onRoom,
   pending,
   room,
   setPending,
@@ -293,12 +379,12 @@ function Lobby({
     setPending(true);
     onError(null);
     try {
-      const updated = await requestJson(path, roomViewSchema, {
+      await requestJson(path, lobbyMutationAcknowledgementSchema, {
         body: JSON.stringify({ commandId: crypto.randomUUID(), ...body }),
         headers: { "content-type": "application/json" },
         method: "POST",
       });
-      onRoom(updated);
+      await onRefresh();
     } catch (caught) {
       if (isRoomExpiredError(caught)) onExpired();
       else onError(errorMessage(caught));
@@ -352,7 +438,9 @@ function Lobby({
 
         {room.phase === "active" ? (
           <p className="notice">
-            The table is ready. Gameplay controls arrive in the next build stage.
+            {game === null
+              ? "Synchronizing the hand…"
+              : `${game.phase.replaceAll("-", " ")} · ${String(game.wallCount)} tiles remain`}
           </p>
         ) : (
           <div className="lobby-actions">
@@ -405,6 +493,7 @@ function Lobby({
               !window.confirm("Leave this hand and give your seat to a bot?")
             )
               return;
+            onInvalidateRoomRequests();
             setPending(true);
             void requestJson(`/api/rooms/${room.code}/leave`, undefined, {
               body: JSON.stringify({ commandId: crypto.randomUUID() }),
@@ -448,7 +537,9 @@ async function requestJson<T>(
   schema: Readonly<{ parse: (input: unknown) => T }> | undefined,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(path, { ...init, credentials: "same-origin" });
+  const headers = new Headers(init.headers);
+  headers.set("x-controller-id", controllerId);
+  const response = await fetch(path, { ...init, credentials: "same-origin", headers });
   const body: unknown = await response.json();
   if (!response.ok) {
     const error = apiErrorSchema.safeParse(body);
@@ -488,6 +579,8 @@ if (root === null) throw new Error("Missing application root");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ServerStateProvider>
+      <App />
+    </ServerStateProvider>
   </StrictMode>,
 );

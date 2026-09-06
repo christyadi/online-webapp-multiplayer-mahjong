@@ -6,19 +6,23 @@ export const roomCodeSchema = z
 
 export const nicknameSchema = z.string().trim().min(1).max(20);
 
-export const roomMutationSchema = z.object({
+export const roomMutationSchema = z.strictObject({
   commandId: z.uuid(),
 });
 
-export const createRoomRequestSchema = roomMutationSchema.extend({
-  nickname: nicknameSchema,
-});
+export const createRoomRequestSchema = roomMutationSchema
+  .extend({
+    nickname: nicknameSchema,
+  })
+  .strict();
 
 export const joinRoomRequestSchema = createRoomRequestSchema;
 
-export const setReadyRequestSchema = roomMutationSchema.extend({
-  ready: z.boolean(),
-});
+export const setReadyRequestSchema = roomMutationSchema
+  .extend({
+    ready: z.boolean(),
+  })
+  .strict();
 
 export const lobbyOccupantSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -35,6 +39,7 @@ export const roomViewSchema = z.object({
   canStart: z.boolean(),
   code: roomCodeSchema,
   phase: z.enum(["lobby", "active"]),
+  roomRevision: z.number().int().nonnegative(),
   seats: z.array(lobbyOccupantSchema.nullable()).length(4),
   viewerReady: z.boolean(),
   viewerSeat: z.number().int().min(0).max(3),
@@ -53,9 +58,16 @@ export const apiErrorSchema = z.object({
   message: z.string(),
 });
 
+export const lobbyMutationAcknowledgementSchema = z.object({
+  commandId: z.uuid(),
+  ok: z.literal(true),
+  roomCode: roomCodeSchema,
+});
+
 export type ApiError = z.infer<typeof apiErrorSchema>;
 export type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;
 export type JoinRoomRequest = z.infer<typeof joinRoomRequestSchema>;
+export type LobbyMutationAcknowledgement = z.infer<typeof lobbyMutationAcknowledgementSchema>;
 export type RoomView = z.infer<typeof roomViewSchema>;
 export type SessionView = z.infer<typeof sessionViewSchema>;
 export type SetReadyRequest = z.infer<typeof setReadyRequestSchema>;

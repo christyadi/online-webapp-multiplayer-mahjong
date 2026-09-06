@@ -1,9 +1,16 @@
-import { randomInt } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 
-import type { RoomView } from "@mahjong-together/shared";
+import {
+  gameSnapshotSchema,
+  type CommandAcknowledgement,
+  type GameCommand,
+  type GameSnapshot,
+  type RoomView,
+} from "@mahjong-together/shared";
 
+import { legalActionsForSeat, startHand, transition, type HandState } from "../game/state.js";
+import { createTileSet, shuffleTiles, type SeatIndex } from "../game/wall.js";
 import type { GuestSession } from "../identity/sessions.js";
-import type { SeatIndex } from "../game/wall.js";
 
 const ROOM_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -22,10 +29,15 @@ type RoomSeat = HumanSeat | BotSeat | null;
 
 type Room = {
   code: string;
+  commandCounts: Map<string, number>;
+  commands: Map<string, Readonly<{ acknowledgement: CommandAcknowledgement; payloadHash: string }>>;
   createdAt: number;
+  hand: HandState | null;
   lastActivityAt: number;
   noConnectedHumansSince: number | null;
   phase: "lobby" | "active";
+  queue: Promise<void>;
+  roomRevision: number;
   seats: [RoomSeat, RoomSeat, RoomSeat, RoomSeat];
 };
 
@@ -41,6 +53,7 @@ export class RoomError extends Error {
 type RoomStoreOptions = Readonly<{
   clock?: () => number;
   codeFactory?: () => string;
+  handFactory?: (dealer: SeatIndex) => HandState;
   maxRooms?: number;
 }>;
 
@@ -48,13 +61,18 @@ export class RoomStore {
   readonly #clock: () => number;
   readonly #codeFactory: () => string;
   readonly #guestRooms = new Map<string, string>();
+  readonly #handFactory: (dealer: SeatIndex) => HandState;
   #joinSequence = 0;
+  readonly #listeners = new Set<(code: string) => void>();
   readonly #maxRooms: number;
   readonly #rooms = new Map<string, Room>();
 
   constructor(options: RoomStoreOptions = {}) {
     this.#clock = options.clock ?? Date.now;
     this.#codeFactory = options.codeFactory ?? generateRoomCode;
+    this.#handFactory =
+      options.handFactory ??
+      ((dealer) => startHand(randomUUID(), dealer, shuffleTiles(createTileSet())));
     this.#maxRooms = options.maxRooms ?? 20;
   }
 
@@ -70,14 +88,20 @@ export class RoomStore {
     const creator = this.createHumanSeat(session.guestId, nickname, true);
     const room: Room = {
       code,
+      commandCounts: new Map(),
+      commands: new Map(),
       createdAt: now,
+      hand: null,
       lastActivityAt: now,
       noConnectedHumansSince: null,
       phase: "lobby",
+      queue: Promise.resolve(),
+      roomRevision: 1,
       seats: [creator, null, null, null],
     };
     this.#rooms.set(code, room);
     this.#guestRooms.set(session.guestId, code);
+    this.notify(code);
     return viewFor(room, session.guestId);
   }
 
@@ -97,7 +121,9 @@ export class RoomStore {
     room.seats[seat as SeatIndex] = this.createHumanSeat(session.guestId, nickname, false);
     room.lastActivityAt = this.#clock();
     room.noConnectedHumansSince = null;
+    room.roomRevision += 1;
     this.#guestRooms.set(session.guestId, code);
+    this.notify(code);
     return viewFor(room, session.guestId);
   }
 
@@ -128,6 +154,8 @@ export class RoomStore {
     if (room.phase !== "lobby") throw new RoomError("room-active", "The hand has started");
     seat.ready = ready;
     room.lastActivityAt = this.#clock();
+    room.roomRevision += 1;
+    this.notify(code);
     return viewFor(room, session.guestId);
   }
 
@@ -145,8 +173,16 @@ export class RoomStore {
     for (const seatIndex of [0, 1, 2, 3] as const) {
       room.seats[seatIndex] ??= { kind: "bot" };
     }
+    const dealerIndex = room.seats.findIndex(
+      (occupant) => occupant?.kind === "human" && occupant.host,
+    );
+    if (dealerIndex === -1) throw new Error("Lobby host invariant failed");
+    const dealer = dealerIndex as SeatIndex;
+    room.hand = this.#handFactory(dealer);
     room.phase = "active";
     room.lastActivityAt = this.#clock();
+    room.roomRevision += 1;
+    this.notify(code);
     return viewFor(room, session.guestId);
   }
 
@@ -158,6 +194,8 @@ export class RoomStore {
     room.lastActivityAt = this.#clock();
     this.ensureHost(room);
     this.updateConnectedState(room);
+    room.roomRevision += 1;
+    this.notify(code);
   }
 
   disconnect(guestId: string): void {
@@ -180,6 +218,8 @@ export class RoomStore {
     }
     room.lastActivityAt = this.#clock();
     this.updateConnectedState(room);
+    room.roomRevision += 1;
+    this.notify(code);
   }
 
   cleanupExpired(): void {
@@ -200,8 +240,107 @@ export class RoomStore {
     return () => clearInterval(timer);
   }
 
+  subscribe(listener: (code: string) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  getGameSnapshot(session: GuestSession, code: string): GameSnapshot {
+    this.cleanupExpired();
+    const { room, seatIndex } = this.requireHumanMembership(session.guestId, code);
+    if (room.phase !== "active" || room.hand === null) {
+      throw new RoomError("hand-not-active", "No hand is currently active");
+    }
+    return snapshotFor(room, seatIndex, this.#clock());
+  }
+
+  isExactCachedGameCommand(session: GuestSession, command: GameCommand): boolean {
+    const room = this.#rooms.get(command.roomId);
+    if (room === undefined || this.#guestRooms.get(session.guestId) !== room.code) return false;
+    const cached = room.commands.get(`${session.guestId}:${command.commandId}`);
+    return cached?.payloadHash === hashCommand(command);
+  }
+
+  executeGameCommand(session: GuestSession, command: GameCommand): Promise<CommandAcknowledgement> {
+    return Promise.resolve().then(() => {
+      this.cleanupExpired();
+      const room = this.requireRoom(command.roomId);
+      return this.enqueue(room, () => this.executeGameCommandNow(room, session, command));
+    });
+  }
+
   get size(): number {
     return this.#rooms.size;
+  }
+
+  enqueue<T>(room: Room, action: () => T | Promise<T>): Promise<T> {
+    const result = room.queue.then(action, action);
+    room.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  executeGameCommandNow(
+    room: Room,
+    session: GuestSession,
+    command: GameCommand,
+  ): CommandAcknowledgement {
+    const membership = this.requireHumanMembership(session.guestId, room.code);
+    const cacheKey = `${session.guestId}:${command.commandId}`;
+    const payloadHash = hashCommand(command);
+    const cached = room.commands.get(cacheKey);
+    if (cached !== undefined) {
+      return cached.payloadHash === payloadHash
+        ? cached.acknowledgement
+        : {
+            code: "command-id-reused",
+            commandId: command.commandId,
+            message: "This command ID was already used for a different request",
+            ok: false,
+            roomRevision: room.roomRevision,
+          };
+    }
+
+    const commandCount = room.commandCounts.get(session.guestId) ?? 0;
+    if (commandCount >= 10_000) {
+      return {
+        code: "command-limit",
+        commandId: command.commandId,
+        message: "This guest has reached the room command limit",
+        ok: false,
+        roomRevision: room.roomRevision,
+      };
+    }
+    room.commandCounts.set(session.guestId, commandCount + 1);
+
+    let acknowledgement: CommandAcknowledgement;
+    if (room.phase !== "active" || room.hand === null) {
+      acknowledgement = rejectedCommand(command, "hand-not-active", "No hand is active", room);
+    } else if (command.handId !== room.hand.handId) {
+      acknowledgement = rejectedCommand(command, "stale-hand", "This hand has ended", room);
+    } else {
+      const result = transition(room.hand, membership.seatIndex, {
+        ...command.action,
+        decisionId: command.decisionId,
+      });
+      if (result.ok) {
+        room.hand = result.state;
+        room.roomRevision += 1;
+        room.lastActivityAt = this.#clock();
+        acknowledgement = {
+          commandId: command.commandId,
+          ok: true,
+          roomRevision: room.roomRevision,
+        };
+        this.notify(room.code);
+      } else {
+        acknowledgement = rejectedCommand(command, result.code, result.message, room);
+      }
+    }
+    room.commands.set(cacheKey, { acknowledgement, payloadHash });
+    return acknowledgement;
   }
 
   #assertCode(code: string): void {
@@ -241,6 +380,7 @@ export class RoomStore {
     for (const seat of room.seats) {
       if (seat?.kind === "human") this.#guestRooms.delete(seat.guestId);
     }
+    this.notify(room.code);
   }
 
   ensureHost(room: Room): void {
@@ -274,11 +414,105 @@ export class RoomStore {
     return room;
   }
 
+  notify(code: string): void {
+    for (const listener of this.#listeners) listener(code);
+  }
+
   updateConnectedState(room: Room): void {
     const hasConnectedHuman = room.seats.some((seat) => seat?.kind === "human" && seat.connected);
     if (hasConnectedHuman) room.noConnectedHumansSince = null;
     else room.noConnectedHumansSince ??= this.#clock();
   }
+}
+
+function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapshot {
+  const hand = room.hand;
+  if (hand === null) throw new Error("Active hand invariant failed");
+  const revealAll = hand.phase === "hand-ended";
+  const pendingDiscard =
+    hand.phase === "awaiting-discard-claims"
+      ? {
+          seat: hand.discard.seat,
+          tile: requirePublicDiscard(hand, hand.discard.seat, hand.discard.tileId),
+        }
+      : null;
+  const pendingAddedKong =
+    hand.phase === "awaiting-kong-robbery"
+      ? {
+          seat: hand.proposal.declarer,
+          tile: requireConcealedTile(hand, hand.proposal.declarer, hand.proposal.tileId),
+        }
+      : null;
+
+  // Runtime validation at this private-state/public-DTO boundary prevents an
+  // accidental wall or opposing concealed hand from entering a socket payload.
+  return gameSnapshotSchema.parse({
+    deadline: null,
+    decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
+    handId: hand.handId,
+    legalActions: legalActionsForSeat(hand, viewerSeat),
+    pendingAddedKong,
+    pendingDiscard,
+    phase: hand.phase,
+    players: hand.players.map((player, seat) => {
+      const occupant = room.seats[seat];
+      if (occupant === null || occupant === undefined) {
+        throw new Error("Active seat invariant failed");
+      }
+      return {
+        concealedCount: player.concealed.length,
+        concealedTiles: revealAll || seat === viewerSeat ? player.concealed : null,
+        connected: occupant.kind === "human" && occupant.connected,
+        controller: occupant.kind,
+        discards: player.discards,
+        melds: player.melds.map((meld) => ({
+          concealed: meld.concealed,
+          kind: meld.kind,
+          tileCount: meld.tiles.length,
+          tiles: !revealAll && meld.concealed && seat !== viewerSeat ? null : meld.tiles,
+        })),
+        nickname: occupant.kind === "human" ? occupant.nickname : null,
+        seat,
+      };
+    }),
+    result: hand.phase === "hand-ended" ? hand.result : null,
+    roomId: room.code,
+    roomRevision: room.roomRevision,
+    serverTime: now,
+    viewerSeat,
+    wallCount: hand.wall.length,
+  });
+}
+
+function requirePublicDiscard(hand: HandState, seat: SeatIndex, tileId: string) {
+  const tile = hand.players[seat].discards.find((candidate) => candidate.id === tileId);
+  if (tile === undefined) throw new Error("Pending discard snapshot invariant failed");
+  return tile;
+}
+
+function requireConcealedTile(hand: HandState, seat: SeatIndex, tileId: string) {
+  const tile = hand.players[seat].concealed.find((candidate) => candidate.id === tileId);
+  if (tile === undefined) throw new Error("Pending added kong snapshot invariant failed");
+  return tile;
+}
+
+function hashCommand(command: GameCommand): string {
+  return createHash("sha256").update(JSON.stringify(command)).digest("base64url");
+}
+
+function rejectedCommand(
+  command: GameCommand,
+  code: string,
+  message: string,
+  room: Room,
+): CommandAcknowledgement {
+  return {
+    code,
+    commandId: command.commandId,
+    message,
+    ok: false,
+    roomRevision: room.roomRevision,
+  };
 }
 
 function findHumanSeat(room: Room, guestId: string): SeatIndex | null {
@@ -308,6 +542,7 @@ function viewFor(room: Room, guestId: string): RoomView {
       ),
     code: room.code,
     phase: room.phase,
+    roomRevision: room.roomRevision,
     seats: room.seats.map((seat) => {
       if (seat === null || seat.kind === "bot") return seat;
       return {

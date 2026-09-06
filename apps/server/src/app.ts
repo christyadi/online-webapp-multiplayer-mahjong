@@ -13,10 +13,16 @@ import { fileURLToPath } from "node:url";
 
 import {
   GUEST_COOKIE_NAME,
+  guestTokenFromCookieHeader,
   SessionCapacityError,
   SessionStore,
   type GuestSession,
 } from "./identity/sessions.js";
+import {
+  CommandReplayError,
+  SessionCommandReplay,
+  SlidingWindowRateLimiter,
+} from "./protocol/replay.js";
 import { RoomError, RoomStore } from "./rooms/rooms.js";
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -34,8 +40,12 @@ export function createApp(options: AppOptions = {}) {
   const roomStore = options.roomStore ?? new RoomStore();
   const secureCookies = options.secureCookies ?? appOrigin?.startsWith("https://") === true;
   const sessionStore = options.sessionStore ?? new SessionStore();
+  const lobbyCommands = new SessionCommandReplay<HttpOutcome>();
+  const roomAttemptLimiter = new SlidingWindowRateLimiter();
+  const sessionCreationLimiter = new SlidingWindowRateLimiter();
 
   app.disable("x-powered-by");
+  if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
   app.use((_request, response, next) => {
     response.set({
       "Content-Security-Policy":
@@ -65,7 +75,15 @@ export function createApp(options: AppOptions = {}) {
   });
   app.post("/api/session", (request, response) => {
     try {
-      const established = sessionStore.establish(readGuestToken(request));
+      const presentedToken = readGuestToken(request);
+      if (
+        sessionStore.find(presentedToken) === null &&
+        !sessionCreationLimiter.consume(clientAddress(request), 30, 60_000)
+      ) {
+        sendError(response, 429, "rate-limit", "Too many guest sessions from this address");
+        return;
+      }
+      const established = sessionStore.establish(presentedToken);
       if (established.token !== undefined) {
         response.setHeader("set-cookie", serializeGuestCookie(established.token, secureCookies));
       }
@@ -93,59 +111,119 @@ export function createApp(options: AppOptions = {}) {
   app.post("/api/rooms", (request, response) => {
     const session = requireSession(request, response, sessionStore);
     if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
     const input = createRoomRequestSchema.safeParse(request.body);
     if (!input.success) {
+      if (!consumeInvalidRoomAttempt(response, roomAttemptLimiter, session.guestId)) return;
       sendError(response, 400, "invalid-request", "Enter a nickname from 1 to 20 characters");
       return;
     }
-    runRoomAction(response, () => roomStore.create(session, input.data.nickname), 201);
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { input: input.data, operation: "create-room" },
+      () => requireRoomAttempt(roomAttemptLimiter, session.guestId),
+      () => {
+        const room = roomStore.create(session, input.data.nickname);
+        return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
+      },
+      201,
+    );
   });
   app.post("/api/rooms/:code/join", (request, response) => {
     const session = requireSession(request, response, sessionStore);
     if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
     const input = joinRoomRequestSchema.safeParse(request.body);
     if (!input.success) {
+      if (!consumeInvalidRoomAttempt(response, roomAttemptLimiter, session.guestId)) return;
       sendError(response, 400, "invalid-request", "Enter a nickname from 1 to 20 characters");
       return;
     }
-    runRoomAction(response, () =>
-      roomStore.join(session, request.params.code, input.data.nickname),
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { code: request.params.code, input: input.data, operation: "join-room" },
+      () => requireRoomAttempt(roomAttemptLimiter, session.guestId),
+      () => {
+        const room = roomStore.join(session, request.params.code, input.data.nickname);
+        return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
+      },
     );
   });
   app.post("/api/rooms/:code/ready", (request, response) => {
     const session = requireSession(request, response, sessionStore);
     if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
     const input = setReadyRequestSchema.safeParse(request.body);
     if (!input.success) {
       sendError(response, 400, "invalid-request", "Ready status was not understood");
       return;
     }
-    runRoomAction(response, () =>
-      roomStore.setReady(session, request.params.code, input.data.ready),
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { code: request.params.code, input: input.data, operation: "set-ready" },
+      () => undefined,
+      () => {
+        const room = roomStore.setReady(session, request.params.code, input.data.ready);
+        return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
+      },
     );
   });
   app.post("/api/rooms/:code/start", (request, response) => {
     const session = requireSession(request, response, sessionStore);
     if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
     const input = roomMutationSchema.safeParse(request.body);
     if (!input.success) {
       sendError(response, 400, "invalid-request", "Start request was not understood");
       return;
     }
-    runRoomAction(response, () => roomStore.start(session, request.params.code));
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { code: request.params.code, operation: "start-room" },
+      () => undefined,
+      () => {
+        const room = roomStore.start(session, request.params.code);
+        return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
+      },
+    );
   });
   app.post("/api/rooms/:code/leave", (request, response) => {
     const session = requireSession(request, response, sessionStore);
     if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
     const input = roomMutationSchema.safeParse(request.body);
     if (!input.success) {
       sendError(response, 400, "invalid-request", "Leave request was not understood");
       return;
     }
-    runRoomAction(response, () => {
-      roomStore.leave(session, request.params.code);
-      return { left: true };
-    });
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { code: request.params.code, operation: "leave-room" },
+      () => undefined,
+      () => {
+        roomStore.leave(session, request.params.code);
+        return {
+          commandId: input.data.commandId,
+          ok: true as const,
+          roomCode: request.params.code,
+        };
+      },
+    );
   });
   app.use("/api", (_request, response) => {
     sendError(response, 404, "not-found", "Not found");
@@ -181,21 +259,11 @@ export function createApp(options: AppOptions = {}) {
 }
 
 function readGuestToken(request: Request): string | undefined {
-  const cookieHeader = request.get("cookie");
-  if (cookieHeader === undefined) return undefined;
-  for (const part of cookieHeader.split(";")) {
-    const separator = part.indexOf("=");
-    if (separator === -1) continue;
-    const name = part.slice(0, separator).trim();
-    if (name !== GUEST_COOKIE_NAME) continue;
-    const value = part.slice(separator + 1).trim();
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return undefined;
-    }
-  }
-  return undefined;
+  return guestTokenFromCookieHeader(request.get("cookie"));
+}
+
+function clientAddress(request: Request): string {
+  return request.ip ?? request.socket.remoteAddress ?? "unknown";
 }
 
 function requireSession(
@@ -208,9 +276,68 @@ function requireSession(
   return session;
 }
 
-function runRoomAction(response: Response, action: () => unknown, successStatus = 200): void {
+function requireActiveController(
+  request: Request,
+  response: Response,
+  store: SessionStore,
+  session: GuestSession,
+): boolean {
+  const controllerId = request.get("x-controller-id");
+  if (
+    controllerId !== undefined &&
+    roomMutationSchema.shape.commandId.safeParse(controllerId).success &&
+    store.isActiveController(session.guestId, controllerId)
+  ) {
+    return true;
+  }
+  sendError(
+    response,
+    409,
+    "controller-replaced",
+    "This guest session is controlled from another tab",
+  );
+  return false;
+}
+
+type HttpOutcome = Readonly<{ body: unknown; status: number }>;
+
+class RequestRateError extends Error {}
+
+function runRoomMutation(
+  response: Response,
+  replay: SessionCommandReplay<HttpOutcome>,
+  session: GuestSession,
+  commandId: string,
+  payload: unknown,
+  beforeNewCommand: () => void,
+  action: () => unknown,
+  successStatus = 200,
+): void {
   try {
-    response.status(successStatus).json(action());
+    const replayed = replay.run(session, commandId, payload, beforeNewCommand, () =>
+      roomOutcome(action, successStatus),
+    );
+    sendOutcome(response, replayed.result);
+  } catch (error) {
+    if (error instanceof CommandReplayError) {
+      sendError(response, error.code === "command-limit" ? 429 : 409, error.code, error.message);
+      return;
+    }
+    if (error instanceof RequestRateError) {
+      sendError(response, 429, "rate-limit", error.message);
+      return;
+    }
+    throw error;
+  }
+}
+
+function runRoomAction(response: Response, action: () => unknown, successStatus = 200): void {
+  sendOutcome(response, roomOutcome(action, successStatus));
+}
+
+function roomOutcome(action: () => unknown, successStatus: number): HttpOutcome {
+  try {
+    return { body: action(), status: successStatus };
   } catch (error) {
     if (!(error instanceof RoomError)) throw error;
     const status =
@@ -219,8 +346,28 @@ function runRoomAction(response: Response, action: () => unknown, successStatus 
         : error.code === "host-only" || error.code === "not-in-room"
           ? 403
           : 409;
-    sendError(response, status, error.code, error.message);
+    return { body: { code: error.code, message: error.message } satisfies ApiError, status };
   }
+}
+
+function sendOutcome(response: Response, outcome: HttpOutcome): void {
+  response.status(outcome.status).json(outcome.body);
+}
+
+function requireRoomAttempt(limiter: SlidingWindowRateLimiter, guestId: string): void {
+  if (!limiter.consume(guestId, 10, 60_000)) {
+    throw new RequestRateError("Too many room create or join attempts");
+  }
+}
+
+function consumeInvalidRoomAttempt(
+  response: Response,
+  limiter: SlidingWindowRateLimiter,
+  guestId: string,
+): boolean {
+  if (limiter.consume(guestId, 10, 60_000)) return true;
+  sendError(response, 429, "rate-limit", "Too many room create or join attempts");
+  return false;
 }
 
 function sendError(response: Response, status: number, code: string, message: string): void {

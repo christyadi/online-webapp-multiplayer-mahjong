@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 4 — Build guest identity and the room lobby.
+Milestone 5 — Build the reliable multiplayer protocol.
 
 ## Environment checks (2026-09-05)
 
@@ -120,6 +120,43 @@ Milestone 4 — Build guest identity and the room lobby.
 
 - The same independent read-only reviewer verified both lifecycle corrections and found no remaining critical, high, or medium issue.
 
+## Milestone 4 checkpoint
+
+- Commit `325915e` (`feat: build guest room lobby`) was pushed to the private repository on branch `codex/mahjong-together`.
+
+## Milestone 5 implementation
+
+- Connected started rooms to real authoritative hand state and added a per-room sequential command queue so simultaneous commands are evaluated against one ordered state history.
+- Added strict shared Zod command, acknowledgement, lobby acknowledgement, and recipient-specific game snapshot contracts. Game commands bind room, hand, decision, authenticated guest, action, and UUID command identity.
+- Added session-lifetime HTTP replay handling and room-lifetime gameplay replay handling with payload-hash binding, bounded command counts, typed cached outcomes, and sliding request/command rate limits. Exact retries bypass the gameplay rate counter and cannot execute twice.
+- Added Socket.IO guest authentication, configured-origin enforcement, a 16 KiB transport limit, latest-connection ownership, reconnect grace, room watching, live lobby invalidation, and viewer-specific game broadcasts. Same-origin browser polling handshakes are admitted only when their host and Fetch Metadata match the configured origin; explicit cross-origin requests remain rejected.
+- Added recipient snapshot construction that omits wall order, other concealed hands, concealed-kong identities, and other players' private offers/responses while publishing only the viewer's legal actions. Completed hands reveal their result decomposition.
+- Added a React server-state reducer/context and a retrying Socket.IO client that ignores stale room/game revisions and refreshes lobby state from server notifications.
+- Verification before independent review: formatting, strict typecheck, lint, and production build pass; Vitest passes 9 files and 59 tests; Chromium Playwright passes all 4 lobby/production tests, including live four-guest fan-out. Firefox remains deferred at the user's direction.
+- A Chromium trace exposed legitimate same-origin polling handshakes being rejected because browsers omit `Origin` on the initial same-origin GET. The fallback now requires the exact configured host plus `Sec-Fetch-Site: same-origin`; the focused preconnected-room socket test and full Chromium flow pass after correction.
+
+## Milestone 5 review round 1
+
+- Confirmed high: callback-less or wrong-callback Socket.IO packets could invoke a non-function acknowledgement and escape an event listener. Both handlers now runtime-check the callback and safely ignore malformed packets; integration coverage proves the connection and subsequent valid acknowledgement remain available.
+- Confirmed medium: lobby room DTOs lacked a revision, so overlapping HTTP refreshes could apply an older lobby after a newer active-room response. Every room view now carries its authoritative revision, and the reducer compares room and game revisions before accepting a response; a controlled stale-response regression covers the transition.
+- Confirmed medium: latest-tab ownership only disconnected the prior socket, while its shared-cookie HTTP lobby mutations remained authorized. Each tab now presents a random controller ID in its authenticated socket handshake and HTTP mutations; the session store records only the latest connected controller, and superseded-tab mutations receive a typed rejection. A two-socket/HTTP integration test proves the stale controller cannot mutate while the replacement can.
+- Confirmed medium: repeating a UUID could bypass socket rate limits before payload-bound replay validation, disconnect cleanup reset the rate window, and malformed create/join attempts were not counted. Exact retry exemption now requires a room-cache payload match, histories survive reconnect, all malformed socket traffic counts, and invalid create/join bodies consume the same attempt budget. Focused regressions cover all three paths.
+- Corrected verification: formatting, typecheck, lint, and production build pass; Vitest passes 10 files and 64 tests; Chromium Playwright passes all 4 tests. Firefox remains deferred at the user's direction.
+
+## Milestone 5 review round 2
+
+- The reviewer verified all four round-one corrections and found no remaining critical or high issue.
+- Confirmed medium: clearing or changing rooms removed reducer ordering history, so a delayed old-room read could still resurrect a cleared room or replace a newer membership. The client now uses a monotonic request gate: every room read receives a generation, accepted room/clear outcomes invalidate outstanding reads, and create/join/leave transitions invalidate older membership work. Regressions cover delayed room-after-clear and old-room-after-new-room ordering.
+- Confirmed medium: stale-hand/stale-decision acknowledgements did not include the required recovery view when a client had missed the advancing broadcast. The socket handler now emits a fresh recipient-specific snapshot after either authenticated stale rejection; integration coverage verifies the returned decision and revision match current authoritative state.
+- Corrected verification: formatting, typecheck, lint, and production build pass; Vitest passes 11 files and 66 tests; Chromium Playwright passes all 4 tests. Firefox remains deferred at the user's direction.
+
+## Milestone 5 review round 3
+
+- The reviewer verified stale-command snapshot recovery plus the prior callback, controller, rate-limit, and same-room ordering corrections and found no remaining critical or high issue.
+- Confirmed medium: the join component still performed one direct unguarded current-room fetch, allowing its delayed response to bypass the monotonic request gate. Join completion now calls the shared guarded `refreshRoom` path exclusively; no room response can run `acceptRoom` side effects without winning its request generation.
+- The three-round milestone review cap was reached. The final correction was validated by a focused Chromium race that captures and delays the joined-room response, applies a newer null-room response, releases the stale response, and proves the join page and invite URL remain unchanged.
+- Final corrected verification: formatting, typecheck, lint, and production build pass; Vitest passes 11 files and 66 tests; Chromium Playwright passes all 5 tests. Firefox remains deferred at the user's direction.
+
 ## Next exact step
 
-Create and push the Milestone 4 checkpoint, then connect room gameplay through the reliable multiplayer protocol.
+Create and push the Milestone 5 checkpoint, then implement deterministic bots, action timers, reconnect takeover, and simulation coverage for Milestone 6.

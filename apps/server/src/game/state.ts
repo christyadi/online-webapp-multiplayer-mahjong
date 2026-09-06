@@ -100,6 +100,21 @@ export type HandAction =
       kind: "respond-to-kong-robbery";
     }>;
 
+export type LegalHandActions =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{
+      addedKongs: readonly Readonly<{ meldIndex: number; tileId: string }>[];
+      canWin: boolean;
+      concealedKongs: readonly TileType[];
+      discardTileIds: readonly string[];
+      kind: "discard";
+    }>
+  | Readonly<{
+      kind: "discard-claim";
+      legal: LegalDiscardClaims;
+    }>
+  | Readonly<{ kind: "kong-robbery" }>;
+
 export type HandEffect =
   | Readonly<{
       decisionId: string;
@@ -161,6 +176,54 @@ export function transition(
 
 export function rotateDealer(dealer: SeatIndex): SeatIndex {
   return nextSeat(dealer);
+}
+
+export function legalActionsForSeat(state: HandState, seat: SeatIndex): LegalHandActions {
+  if (state.phase === "hand-ended") return { kind: "none" };
+  if (state.phase === "awaiting-discard") {
+    if (state.turn !== seat) return { kind: "none" };
+    const player = state.players[seat];
+    if (state.turnOrigin === "claim") {
+      return {
+        addedKongs: [],
+        canWin: false,
+        concealedKongs: [],
+        discardTileIds: player.concealed.map((tile) => tile.id),
+        kind: "discard",
+      };
+    }
+    const concealedKongs =
+      state.wall.length === 0
+        ? []
+        : TILE_TYPES.filter(
+            (type) => player.concealed.filter((tile) => tile.type === type).length === 4,
+          );
+    const addedKongs =
+      state.wall.length === 0
+        ? []
+        : player.melds.flatMap((meld, meldIndex) => {
+            if (meld.kind !== "pung" || meld.concealed) return [];
+            const tile = player.concealed.find(
+              (candidate) => candidate.type === meld.tiles[0]?.type,
+            );
+            return tile === undefined ? [] : [{ meldIndex, tileId: tile.id }];
+          });
+    return {
+      addedKongs,
+      canWin: findWinningDecomposition(player.concealed, player.melds) !== null,
+      concealedKongs,
+      discardTileIds: player.concealed.map((tile) => tile.id),
+      kind: "discard",
+    };
+  }
+  if (state.phase === "awaiting-discard-claims") {
+    if (state.responses[seat] !== undefined) return { kind: "none" };
+    const offer = state.eligible.find((candidate) => candidate.seat === seat);
+    return offer === undefined ? { kind: "none" } : { kind: "discard-claim", legal: offer.legal };
+  }
+  return state.eligible.includes(seat) && state.responses[seat] === undefined
+    ? { kind: "kong-robbery" }
+    : { kind: "none" };
 }
 
 function transitionDiscardTurn(

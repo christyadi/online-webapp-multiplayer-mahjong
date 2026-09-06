@@ -18,8 +18,8 @@ test("isolated guests keep distinct seats through joins and refresh", async ({ b
       await expect(guest.getByText(`You are ${expectedSeat}`)).toBeVisible();
     }
 
-    await host.getByRole("button", { name: "Refresh players" }).click();
     await expect(host.locator(".seat-detail", { hasText: "Same name" })).toHaveCount(4);
+    await host.getByRole("button", { name: "Refresh players" }).click();
 
     await guests[0].reload();
     await expect(guests[0].getByText("You are South")).toBeVisible();
@@ -54,6 +54,59 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
 
     await expect(host.getByRole("heading", { name: "Hand starting" })).toBeVisible();
     await expect(host.locator(".seat-detail", { hasText: "Bot" })).toHaveCount(2);
+  } finally {
+    await Promise.all(contexts.map(async (context) => context.close()));
+  }
+});
+
+test("a delayed join refresh cannot resurrect a room after a newer clear", async ({ browser }) => {
+  const contexts: BrowserContext[] = [];
+  try {
+    const host = await newGuestPage(browser, contexts);
+    await host.goto("/");
+    await createRoom(host, "Host");
+    const inviteUrl = host.url();
+
+    const guest = await newGuestPage(browser, contexts);
+    await guest.goto(inviteUrl);
+    await expect(guest.getByRole("heading", { name: "Join Mahjong Together" })).toBeVisible();
+
+    let currentRequest = 0;
+    let markDelayedCaptured = () => undefined;
+    const delayedCaptured = new Promise<void>((resolve) => {
+      markDelayedCaptured = resolve;
+    });
+    let releaseDelayed = () => undefined;
+    const delayedRelease = new Promise<void>((resolve) => {
+      releaseDelayed = resolve;
+    });
+    let markNewerCleared = () => undefined;
+    const newerCleared = new Promise<void>((resolve) => {
+      markNewerCleared = resolve;
+    });
+    await guest.route("**/api/rooms/current", async (route) => {
+      currentRequest += 1;
+      if (currentRequest === 1) {
+        const capturedRoom = await route.fetch();
+        markDelayedCaptured();
+        await delayedRelease;
+        await route.fulfill({ response: capturedRoom });
+        return;
+      }
+      await route.fulfill({ contentType: "application/json", json: { room: null }, status: 200 });
+      markNewerCleared();
+    });
+
+    await guest.getByLabel("Nickname").fill("Guest");
+    await guest.getByRole("button", { name: "Join room" }).click();
+    await delayedCaptured;
+    await guest.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await newerCleared;
+    releaseDelayed();
+
+    await expect(guest.getByRole("button", { name: "Join room" })).toBeEnabled();
+    await expect(guest.getByRole("heading", { name: "Join Mahjong Together" })).toBeVisible();
+    expect(guest.url()).toBe(inviteUrl);
   } finally {
     await Promise.all(contexts.map(async (context) => context.close()));
   }
