@@ -175,7 +175,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The active task is now explicitly updated to create the actual playable interface requested by the user: a real table view, visible local SVG tile art, hand selection/discard controls, claim/win/kong actions, server deadline display, reconnect/controller status, and hand results.
 - The table is responsive down to narrow mobile widths, uses 44px-or-larger controls, keeps opponent concealed tiles private, exposes a native keyboard-accessible help panel, and renders public discards/meld context plus the current wall count.
 - Added a Chromium end-to-end flow that starts a hand with bots, verifies 14 visible tile faces, selects a tile, enables the discard action, sends it through the live Socket.IO command path, and confirms the table remains synchronized.
-- Verification: formatting, strict typecheck, lint, production build, 80 Vitest tests, and all 6 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
+- Verification: formatting, strict typecheck, lint, production build, 82 Vitest tests, and all 6 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
 ## Milestone 7 feedback integrated
 
@@ -201,7 +201,18 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Added an enabled-by-default host auto-rematch countdown that starts the next hand after 15 seconds; the result banner includes an opt-out checkbox and manual Play again control.
 - Expanded the desktop/tablet felt sizing while keeping the narrow mobile layout content-sized.
 - Added an in-flight leave guard to prevent duplicate leave requests during the transition back to the home screen.
+- Tile selection is now a true toggle: selecting the same tile again deselects it, updates the discard control, and exposes the state through `aria-pressed`.
+- Chow selectors now name the exact three-tile sequence rather than anonymous option numbers, retaining every legal combination without duplicated generic buttons.
+- Completed hands now reset connected players' ready state and release disconnected human seats before either a rematch or a lobby return.
+- The results view now offers the host a `Return to lobby` action, clearing bot seats and restoring the ready/start lobby workflow; server coverage proves the reset.
+- A post-results host disconnect now releases that guest from the room and transfers the result controls to the next connected human, preventing stale room membership from blocking a later table.
+
+## Milestone 7 lifecycle review
+
+- Independent re-review found no remaining critical, high, or medium issue in the result lifecycle, rematch countdown, return-to-lobby route, Chow selector, or tile-selection accessibility.
+- The review confirmed that rematch timer cancellation and the shared mutation latch prevent manual/automatic start races; completed-table disconnects transfer host controls without preserving stale membership.
+- Verification after correction: formatting, strict typecheck, lint, production build, 82 Vitest tests, and all 6 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
 
 ## Next exact step
 
-Checkpoint the playable UI, then continue with integrated desktop/mobile browser verification and rematch/deployment work.
+Continue with integrated desktop/mobile browser verification, then prepare the Render deployment checks; Firefox remains deferred.

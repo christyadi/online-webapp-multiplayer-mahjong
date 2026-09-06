@@ -5,6 +5,7 @@ import {
   gameSnapshotSchema,
   lobbyMutationAcknowledgementSchema,
   roomCodeSchema,
+  suitedTileDetails,
   tileTypeIndex,
   type CommandAcknowledgement,
   type GameCommand,
@@ -389,8 +390,11 @@ function Lobby({
   const viewerIsHost = viewer?.kind === "human" && viewer.host;
   const inviteUrl = `${window.location.origin}/room/${room.code}`;
   const leaveInFlight = useRef(false);
+  const mutationInFlight = useRef(false);
 
   const mutate = async (path: string, body: Record<string, unknown>) => {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setPending(true);
     onError(null);
     try {
@@ -404,6 +408,7 @@ function Lobby({
       if (isRoomExpiredError(caught)) onExpired();
       else onError(errorMessage(caught));
     } finally {
+      mutationInFlight.current = false;
       setPending(false);
     }
   };
@@ -440,6 +445,7 @@ function Lobby({
         onError={onError}
         onLeave={leaveGame}
         onPlayAgain={() => void mutate(`/api/rooms/${room.code}/start`, {})}
+        onReturnToLobby={() => void mutate(`/api/rooms/${room.code}/return-to-lobby`, {})}
         pending={pending}
         realtime={realtime}
         room={room}
@@ -569,6 +575,7 @@ type TableProperties = Readonly<{
   onError: (message: string | null) => void;
   onLeave: () => void;
   onPlayAgain: () => void;
+  onReturnToLobby: () => void;
   pending: boolean;
   realtime: Socket | null;
   room: RoomView;
@@ -581,6 +588,7 @@ function Table({
   onError,
   onLeave,
   onPlayAgain,
+  onReturnToLobby,
   pending,
   realtime,
   room,
@@ -592,6 +600,8 @@ function Table({
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
   const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  const autoPlayIntervalRef = useRef<number | null>(null);
+  const autoPlayTimeoutRef = useRef<number | null>(null);
   const playAgainRef = useRef(onPlayAgain);
   const viewer = game.players.find((player) => player.seat === game.viewerSeat);
   const legal = game.legalActions;
@@ -626,6 +636,18 @@ function Table({
     playAgainRef.current = onPlayAgain;
   }, [onPlayAgain]);
 
+  const startNextHand = useCallback(() => {
+    if (autoPlayIntervalRef.current !== null) {
+      window.clearInterval(autoPlayIntervalRef.current);
+      autoPlayIntervalRef.current = null;
+    }
+    if (autoPlayTimeoutRef.current !== null) {
+      window.clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+    playAgainRef.current();
+  }, []);
+
   useEffect(() => {
     if (!canPlayAgain || game.phase !== "hand-ended" || !autoPlayAgain || pending) {
       return;
@@ -634,12 +656,16 @@ function Table({
     const interval = window.setInterval(() => {
       setAutoPlaySeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1_000)));
     }, 250);
-    const timeout = window.setTimeout(() => playAgainRef.current(), 15_000);
+    const timeout = window.setTimeout(startNextHand, 15_000);
+    autoPlayIntervalRef.current = interval;
+    autoPlayTimeoutRef.current = timeout;
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
+      if (autoPlayIntervalRef.current === interval) autoPlayIntervalRef.current = null;
+      if (autoPlayTimeoutRef.current === timeout) autoPlayTimeoutRef.current = null;
     };
-  }, [autoPlayAgain, canPlayAgain, game.phase, pending]);
+  }, [autoPlayAgain, canPlayAgain, game.phase, pending, startNextHand]);
 
   useEffect(() => {
     if (game.phase === "hand-ended" || game.deadline === null) return;
@@ -744,7 +770,9 @@ function Table({
                         }}
                       >
                         <TileArt
-                          onClick={() => setSelectedTileId(tile.id)}
+                          onClick={() =>
+                            setSelectedTileId((selected) => (selected === tile.id ? null : tile.id))
+                          }
                           selected={selectedTileId === tile.id}
                           tile={tile}
                         />
@@ -781,7 +809,8 @@ function Table({
             game={game}
             onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
             onToggleOpponentTiles={() => setShowOpponentTiles((visible) => !visible)}
-            onPlayAgain={onPlayAgain}
+            onPlayAgain={startNextHand}
+            onReturnToLobby={onReturnToLobby}
             pending={pending}
             showOpponentTiles={showOpponentTiles}
           />
@@ -921,6 +950,32 @@ function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
   );
 }
 
+function chowOptionLabel(game: GameSnapshot, tileIds: readonly string[]): string {
+  const viewer = game.players.find((player) => player.seat === game.viewerSeat);
+  const availableTiles = [
+    ...(viewer?.concealedTiles ?? []),
+    ...(game.pendingDiscard === null ? [] : [game.pendingDiscard.tile]),
+  ];
+  const requiredIds = new Set([
+    ...tileIds,
+    ...(game.pendingDiscard === null ? [] : [game.pendingDiscard.tile.id]),
+  ]);
+  const tiles = availableTiles
+    .filter((tile) => requiredIds.has(tile.id))
+    .sort((left, right) => tileTypeIndex(left.type) - tileTypeIndex(right.type));
+  return tiles.length === 3
+    ? `Chow: ${tiles.map((tile) => tileTypeName(tile.type)).join(", ")}`
+    : "Chow";
+}
+
+function tileTypeName(type: Parameters<typeof tileTypeIndex>[0]): string {
+  const details = suitedTileDetails(type);
+  if (details !== null) return `${String(details.rank)} of ${details.suit}`;
+  if (type === "east" || type === "south" || type === "west" || type === "north")
+    return `${type} wind`;
+  return `${type} dragon`;
+}
+
 function ActionBar({
   commandPending,
   game,
@@ -1025,7 +1080,7 @@ function ActionBar({
           >
             {legal.legal.chows.map((_, index) => (
               <option key={index} value={String(index)}>
-                Chow option {String(index + 1)}
+                {chowOptionLabel(game, legal.legal.chows[index]?.tileIds ?? [])}
               </option>
             ))}
           </select>
@@ -1079,6 +1134,7 @@ function ResultBanner({
   onToggleAutoPlay,
   onToggleOpponentTiles,
   onPlayAgain,
+  onReturnToLobby,
   pending,
   showOpponentTiles,
 }: Readonly<{
@@ -1089,6 +1145,7 @@ function ResultBanner({
   onToggleAutoPlay: () => void;
   onToggleOpponentTiles: () => void;
   onPlayAgain: () => void;
+  onReturnToLobby: () => void;
   pending: boolean;
   showOpponentTiles: boolean;
 }>) {
@@ -1122,6 +1179,14 @@ function ResultBanner({
         type="button"
       >
         {canPlayAgain ? (pending ? "Starting…" : "Play again") : "Waiting for host"}
+      </button>
+      <button
+        className="text-button"
+        disabled={!canPlayAgain || pending}
+        onClick={onReturnToLobby}
+        type="button"
+      >
+        {canPlayAgain ? "Return to lobby" : "Waiting for host"}
       </button>
       <button className="secondary" onClick={onToggleOpponentTiles} type="button">
         {showOpponentTiles ? "Hide other hands" : "Show other hands"}

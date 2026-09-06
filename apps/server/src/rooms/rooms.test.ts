@@ -85,6 +85,63 @@ describe("room lobby", () => {
     });
   });
 
+  it("returns a completed table to a ready-reset lobby and clears bot seats", () => {
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000003", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      codeFactory: () => "lobbyreturn1",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = store.create(guest(1), "Host");
+    store.join(guest(2), room.code, "Friend");
+    store.setReady(guest(1), room.code, true);
+    store.setReady(guest(2), room.code, true);
+    store.start(guest(1), room.code);
+
+    const lobby = store.returnToLobby(guest(1), room.code);
+    expect(lobby).toMatchObject({ canStart: false, phase: "lobby", viewerReady: false });
+    expect(lobby.seats).toEqual([
+      expect.objectContaining({ host: true, kind: "human", ready: false }),
+      expect.objectContaining({ kind: "human", ready: false }),
+      null,
+      null,
+    ]);
+    expect(() => store.getGameSnapshot(guest(1), room.code)).toThrow(
+      expect.objectContaining({ code: "hand-not-active" }),
+    );
+    expect(() => store.returnToLobby(guest(2), room.code)).toThrow(
+      expect.objectContaining({ code: "hand-active" }),
+    );
+  });
+
+  it("releases a host who disconnects after results and transfers result controls", async () => {
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000004", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      codeFactory: () => "resultdrop01",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = store.create(guest(1), "Host");
+    store.join(guest(2), room.code, "Friend");
+    store.setReady(guest(1), room.code, true);
+    store.setReady(guest(2), room.code, true);
+    store.start(guest(1), room.code);
+
+    await store.disconnect(guest(1).guestId);
+
+    expect(store.getCurrent(guest(1))).toBeNull();
+    const friend = store.getForGuest(guest(2), room.code);
+    expect(friend.seats[0]).toBeNull();
+    expect(friend.seats[1]).toMatchObject({ host: true, kind: "human" });
+    expect(store.returnToLobby(guest(2), room.code)).toMatchObject({ phase: "lobby" });
+  });
+
   it("transfers lobby hosting to the longest-present connected human", () => {
     const store = new RoomStore({ codeFactory: () => "roomcode0003" });
     const room = store.create(guest(1), "First");

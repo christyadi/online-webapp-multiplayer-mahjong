@@ -85,7 +85,12 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     expect(afterOrder).not.toEqual(beforeOrder);
     const discard = host.getByRole("button", { name: "Discard selected" });
     await expect(discard).toBeDisabled();
-    await host.locator(".tile-rack .tile-button").first().click();
+    const firstTile = host.locator(".tile-rack .tile-button").first();
+    await firstTile.click();
+    await expect(discard).toBeEnabled();
+    await firstTile.click();
+    await expect(discard).toBeDisabled();
+    await firstTile.click();
     await expect(discard).toBeEnabled();
     await discard.click();
     await expect(host.locator(".table-felt")).toBeVisible();

@@ -194,7 +194,7 @@ export class RoomStore {
     const humans = room.seats.filter(
       (occupant): occupant is HumanSeat => occupant?.kind === "human",
     );
-    if (humans.some((human) => human.connected && !human.ready)) {
+    if (!rematch && humans.some((human) => human.connected && !human.ready)) {
       throw new RoomError("players-not-ready", "Every connected player must be ready");
     }
     for (const seatIndex of [0, 1, 2, 3] as const) {
@@ -214,6 +214,24 @@ export class RoomStore {
     room.lastActivityAt = this.#clock();
     room.roomRevision += 1;
     this.refreshAutomation(room, true);
+    this.notify(code);
+    return viewFor(room, session.guestId);
+  }
+
+  returnToLobby(session: GuestSession, code: string): RoomView {
+    this.cleanupExpired();
+    const { room, seat } = this.requireHumanMembership(session.guestId, code);
+    if (room.phase !== "active" || room.hand?.phase !== "hand-ended") {
+      throw new RoomError("hand-active", "Finish the hand before returning to the lobby");
+    }
+    if (!seat.host)
+      throw new RoomError("host-only", "Only the host can return the table to the lobby");
+    this.cancelAutomation(room);
+    room.hand = null;
+    room.phase = "lobby";
+    this.resetLobbySeats(room);
+    room.lastActivityAt = this.#clock();
+    room.roomRevision += 1;
     this.notify(code);
     return viewFor(room, session.guestId);
   }
@@ -262,13 +280,13 @@ export class RoomStore {
       const seat = room.seats[seatIndex];
       if (seat?.kind !== "human") return;
 
-      if (room.phase === "lobby") {
+      if (room.phase === "lobby" || room.hand?.phase === "hand-ended") {
         room.seats[seatIndex] = null;
         this.#guestRooms.delete(guestId);
         this.ensureHost(room);
       } else {
-        this.resolveExpiredDecision(room);
         seat.connected = false;
+        this.resolveExpiredDecision(room);
       }
       room.lastActivityAt = this.#clock();
       this.updateConnectedState(room);
@@ -404,6 +422,7 @@ export class RoomStore {
   ): void {
     const previousDecision = room.hand?.phase === "hand-ended" ? null : room.hand?.decisionId;
     room.hand = result.state;
+    if (result.state.phase === "hand-ended") this.resetReadyAfterHand(room);
     room.roomRevision += 1;
     room.lastActivityAt = this.#clock();
     if (!deferAutomation) {
@@ -635,6 +654,35 @@ export class RoomStore {
     if (humans.some((human) => human.host)) return;
     const nextHost = humans[0];
     if (nextHost !== undefined) nextHost.host = true;
+  }
+
+  resetReadyAfterHand(room: Room): void {
+    for (const [seatIndex, seat] of room.seats.entries()) {
+      if (seat?.kind !== "human") continue;
+      if (!seat.connected) {
+        this.#guestRooms.delete(seat.guestId);
+        room.seats[seatIndex as SeatIndex] = null;
+      } else {
+        seat.ready = false;
+      }
+    }
+    this.ensureHost(room);
+    this.updateConnectedState(room);
+  }
+
+  resetLobbySeats(room: Room): void {
+    for (const [seatIndex, seat] of room.seats.entries()) {
+      if (seat?.kind === "bot") {
+        room.seats[seatIndex as SeatIndex] = null;
+      } else if (seat?.kind === "human" && !seat.connected) {
+        this.#guestRooms.delete(seat.guestId);
+        room.seats[seatIndex as SeatIndex] = null;
+      } else if (seat?.kind === "human") {
+        seat.ready = false;
+      }
+    }
+    this.ensureHost(room);
+    this.updateConnectedState(room);
   }
 
   requireHumanMembership(

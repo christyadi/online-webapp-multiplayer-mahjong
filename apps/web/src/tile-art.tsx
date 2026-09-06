@@ -73,7 +73,13 @@ export function TileArt({ tile, selected = false, onClick }: TileArtProperties) 
   return onClick === undefined ? (
     face
   ) : (
-    <button aria-label={`Select ${label}`} className="tile-button" onClick={onClick} type="button">
+    <button
+      aria-label={`${selected ? "Deselect" : "Select"} ${label}`}
+      aria-pressed={selected}
+      className="tile-button"
+      onClick={onClick}
+      type="button"
+    >
       {face}
     </button>
   );

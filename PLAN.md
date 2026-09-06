@@ -34,3 +34,8 @@
 - [x] Offer host auto-rematch after a 15-second countdown, with a checkbox to opt out.
 - [x] Make the board use more tablet/desktop space while retaining the mobile fallback.
 - [x] Guard leave mutations against duplicate clicks and preserve immediate new-room creation.
+- [x] Let a selected tile be deselected by clicking it again, with an explicit pressed state for assistive technology.
+- [x] Label every Chow selector option with its exact three-tile combination.
+- [x] Reset readiness and release disconnected humans when a hand completes.
+- [x] Let the host return a completed table to the lobby, clearing bot seats so friends can join before the next hand.
+- [x] Release a host who disconnects on the results screen and transfer rematch and lobby controls to the next connected human.

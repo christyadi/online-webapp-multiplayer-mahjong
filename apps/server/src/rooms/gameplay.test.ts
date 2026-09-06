@@ -171,12 +171,12 @@ describe("queued room gameplay", () => {
       scheduler: time.schedule,
       botDelayMs: () => 1_000,
     });
-    const room = startRoom(store, 2);
+    startRoom(store, 2);
     await store.disconnect(guest(0).guestId);
     await store.disconnect(guest(1).guestId);
 
     let scheduledActions = 0;
-    while (store.getGameSnapshot(guest(0), room.code).phase !== "hand-ended") {
+    while (store.getCurrent(guest(0)) !== null) {
       if (scheduledActions >= 1_000 || !(await time.advanceNext())) {
         throw new Error("All-bot room failed to finish within 1,000 scheduled actions");
       }
@@ -184,6 +184,7 @@ describe("queued room gameplay", () => {
     }
 
     expect(scheduledActions).toBeLessThan(1_000);
+    expect(await time.advanceNext()).toBe(false);
   });
 
   it("deduplicates commands, binds their payload, rejects wrong seats, and hides private tiles", async () => {

@@ -225,6 +225,28 @@ export function createApp(options: AppOptions = {}) {
       },
     );
   });
+  app.post("/api/rooms/:code/return-to-lobby", (request, response) => {
+    const session = requireSession(request, response, sessionStore);
+    if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
+    const input = roomMutationSchema.safeParse(request.body);
+    if (!input.success) {
+      sendError(response, 400, "invalid-request", "Return-to-lobby request was not understood");
+      return;
+    }
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { code: request.params.code, operation: "return-to-lobby" },
+      () => undefined,
+      () => {
+        const room = roomStore.returnToLobby(session, request.params.code);
+        return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
+      },
+    );
+  });
   app.use("/api", (_request, response) => {
     sendError(response, 404, "not-found", "Not found");
   });
