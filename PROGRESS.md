@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 3 — Implement the pure hand state machine.
+Milestone 4 — Build guest identity and the room lobby.
 
 ## Environment checks (2026-09-05)
 
@@ -98,6 +98,28 @@ Milestone 3 — Implement the pure hand state machine.
 
 - The same independent read-only reviewer verified that accepted claim objects and nested chow tuples are detached from caller-owned input and found no remaining critical, high, or medium issue.
 
+## Milestone 3 checkpoint
+
+- Commit `603434c` (`feat: implement mahjong hand state machine`) was pushed to the private repository on branch `codex/mahjong-together`.
+
+## Milestone 4 implementation
+
+- Added 24-hour opaque guest sessions backed by 32 random bytes, with only SHA-256 token hashes retained in memory, HttpOnly/SameSite=Lax cookies, Secure cookies for the configured HTTPS origin, reuse on refresh, expiry pruning, and the 1,000-session capacity guard.
+- Added cryptographically generated 12-character room codes, one-room-per-guest enforcement, 20-room capacity, first-free E/S/W/N seat assignment, duplicate-safe display names, ready/host/start controls, bot filling, explicit leave behavior, longest-present host transfer, and 30-minute empty/2-hour lobby/12-hour absolute expiry rules.
+- Added same-origin mutation enforcement, 16 KiB JSON body limits, private no-store API responses, standard security/noindex headers, and viewer-specific lobby DTOs without guest credentials or ownership identifiers.
+- Added the working home/invite/lobby interface with create, join, ready, start, refresh, copy/manual-copy, leave, useful errors, session-preserving refresh, and responsive 44px controls. It uses no background polling; live socket-driven updates are part of the reliable multiplayer protocol milestone.
+- Verification before independent review: typecheck, lint, and build pass; Vitest passes 6 files and 44 tests; Chromium Playwright passes 3 tests covering two isolated guests plus bot start, four isolated duplicate-named guests retaining distinct seats across refresh, and a useful fifth-player rejection. Firefox remains deferred at the user's direction.
+
+## Milestone 4 review round 1
+
+- Confirmed medium: ready/start/leave/disconnect mutation paths did not check expiry first, so a mutation could revive a two-hour lobby; cleanup was also only lazy. Every public room operation now enforces expiry, and the server starts one unref'ed cleanup interval that is disposed when the HTTP server closes. Fake-clock tests cover mutation rejection, scheduled deletion, and timer disposal.
+- Confirmed medium: manual refresh ignored a missing current room and left a stale lobby visible; the shared refresh path also lacked a distinct recovery state. The client now tracks prior occupancy, clears expired state and route data, presents an accessible `Room expired` screen with a return-home action, and handles `room-not-found` mutation responses the same way.
+- Corrected verification: format, typecheck, lint, and build pass; Vitest passes 6 files and 46 tests; Chromium Playwright passes 4 tests, including the explicit expired-room recovery transition.
+
+## Milestone 4 review round 2
+
+- The same independent read-only reviewer verified both lifecycle corrections and found no remaining critical, high, or medium issue.
+
 ## Next exact step
 
-Create and push the Milestone 3 checkpoint, then implement guest identity and the room lobby.
+Create and push the Milestone 4 checkpoint, then connect room gameplay through the reliable multiplayer protocol.

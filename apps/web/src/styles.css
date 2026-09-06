@@ -33,6 +33,28 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid #9b958a;
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  color: inherit;
+  background: white;
+  font: inherit;
+}
+
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid #235ea7;
+  outline-offset: 3px;
+}
+
 button:focus-visible {
   outline: 3px solid #172033;
   outline-offset: 3px;
@@ -52,6 +74,110 @@ main {
   padding: clamp(1.5rem, 5vw, 3rem);
   background: #fffdf8;
   box-shadow: 0 1rem 3rem rgb(33 43 54 / 10%);
+}
+
+.nickname-form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.nickname-form label,
+.seat-name {
+  font-weight: 750;
+}
+
+.house-rules-note,
+.seat-detail {
+  color: #5d6470;
+}
+
+.error {
+  margin: 0.5rem 0 0;
+  color: #a12828;
+  font-weight: 650;
+}
+
+a {
+  color: #174980;
+}
+
+.lobby-page {
+  align-items: start;
+}
+
+.lobby-card {
+  width: min(100%, 48rem);
+  border: 1px solid #d7d0c3;
+  border-radius: 1rem;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  background: #fffdf8;
+  box-shadow: 0 1rem 3rem rgb(33 43 54 / 10%);
+}
+
+.lobby-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.seat-chip {
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  color: #174980;
+  background: #e4eefb;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.seat-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.seat {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 0.75rem;
+  border: 1px solid #ded8cc;
+  border-radius: 0.65rem;
+  padding: 0.85rem;
+  background: #f9f6ef;
+}
+
+.lobby-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+button.secondary {
+  border: 1px solid #235ea7;
+  color: #174980;
+  background: white;
+}
+
+button.text-button {
+  margin-top: 1rem;
+  padding-inline: 0;
+  color: #8a2929;
+  background: transparent;
+}
+
+.invite-panel,
+.notice {
+  margin-top: 1.5rem;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: #eef3f7;
+}
+
+.invite-panel p:first-child {
+  margin-top: 0;
 }
 
 .eyebrow {
@@ -82,5 +208,21 @@ p {
   button:hover {
     background: #174980;
     transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 34rem) {
+  .lobby-heading {
+    display: block;
+  }
+
+  .seat-chip {
+    display: inline-block;
+    margin-top: 0.25rem;
+  }
+
+  .seat {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
   }
 }
