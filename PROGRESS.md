@@ -189,6 +189,9 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Added seat-specific card colors and authoritative `activeSeat`/`waitingSeats` snapshot fields so every card clearly indicates playing, waiting for discard/claim, observing, or ended state.
 - Added a results-only “Show other hands” option; the server already reveals concealed hands only in `hand-ended` snapshots, and a regression verifies that boundary.
 - Added regression assertions for four seat cards, centralized discards, no per-player discard strips, and value-bearing tile labels.
+- Refined the end-of-hand reveal so the viewer's own lower rack remains the single source of their tiles; “Show other hands” now affects opponents only.
+- Added a deterministic `Sort hand` button using Mahjong tile order with stable physical-tile tie breaks, clearing the current selection after sorting.
+- Added a visible “Drag tiles to reorder” hint and a subtle grip affordance on each draggable tile while preserving native drag behavior.
 
 ## Next exact step
 

@@ -5,6 +5,7 @@ import {
   gameSnapshotSchema,
   lobbyMutationAcknowledgementSchema,
   roomCodeSchema,
+  tileTypeIndex,
   type CommandAcknowledgement,
   type GameCommand,
   type GameSnapshot,
@@ -585,6 +586,17 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
   const orderedTiles = orderedTileIds
     .map((id) => serverTiles.find((tile) => tile.id === id))
     .filter((tile): tile is (typeof serverTiles)[number] => tile !== undefined);
+  const sortHand = () => {
+    setTileOrder(
+      [...serverTiles]
+        .sort((left, right) => {
+          const typeDifference = tileTypeIndex(left.type) - tileTypeIndex(right.type);
+          return typeDifference === 0 ? left.id.localeCompare(right.id) : typeDifference;
+        })
+        .map((tile) => tile.id),
+    );
+    setSelectedTileId(null);
+  };
   const deadlineRemaining =
     game.deadline === null
       ? null
@@ -660,10 +672,16 @@ function Table({ error, game, onError, onLeave, realtime, room }: TablePropertie
               <PlayerPanel game={game} player={player} showOpponentTiles={showOpponentTiles} />
               {player.seat === game.viewerSeat ? (
                 <div className="hand-controls">
+                  <div className="hand-tools">
+                    <button className="secondary sort-button" onClick={sortHand} type="button">
+                      Sort hand
+                    </button>
+                    <span className="drag-hint">Drag tiles to reorder</span>
+                  </div>
                   <div className="tile-rack" aria-label="Your concealed tiles">
                     {orderedTiles.map((tile) => (
                       <div
-                        aria-label={`Move ${tile.id}`}
+                        aria-label="Drag tile to reorder"
                         className="draggable-tile"
                         data-tile-id={tile.id}
                         draggable
@@ -759,8 +777,8 @@ function PlayerPanel({
   player: GameSnapshot["players"][number];
   showOpponentTiles: boolean;
 }>) {
-  const showTiles =
-    player.seat === game.viewerSeat || (game.phase === "hand-ended" && showOpponentTiles);
+  const isViewer = player.seat === game.viewerSeat;
+  const showTiles = !isViewer && game.phase === "hand-ended" && showOpponentTiles;
   const status = playerStatus(game, player.seat);
   return (
     <article
@@ -777,20 +795,22 @@ function PlayerPanel({
       <span className={`turn-indicator turn-${status.kind}`} aria-live="polite">
         {status.label}
       </span>
-      <div
-        className="opponent-tiles"
-        aria-label={
-          showTiles
-            ? `${player.nickname ?? "Player"}'s revealed tiles`
-            : `${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`
-        }
-      >
-        {showTiles
-          ? (player.concealedTiles ?? []).map((tile) => <TileArt key={tile.id} tile={tile} />)
-          : Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
-              <span className="tile-back" key={index} />
-            ))}
-      </div>
+      {isViewer ? null : (
+        <div
+          className="opponent-tiles"
+          aria-label={
+            showTiles
+              ? `${player.nickname ?? "Player"}'s revealed tiles`
+              : `${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`
+          }
+        >
+          {showTiles
+            ? (player.concealedTiles ?? []).map((tile) => <TileArt key={tile.id} tile={tile} />)
+            : Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
+                <span className="tile-back" key={index} />
+              ))}
+        </div>
+      )}
       {player.melds.length === 0 ? null : (
         <div className="meld-strip" aria-label={`${player.nickname ?? "Player"} exposed melds`}>
           {player.melds.map((meld, index) => (

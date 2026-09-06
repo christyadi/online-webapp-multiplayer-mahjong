@@ -72,6 +72,8 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
       "aria-label",
       /value/,
     );
+    await expect(host.getByRole("button", { name: "Sort hand" })).toBeVisible();
+    await expect(host.getByText("Drag tiles to reorder")).toBeVisible();
     const rackTiles = host.locator(".tile-rack .draggable-tile");
     const beforeOrder = await rackTiles.evaluateAll((elements) =>
       elements.map((element) => element.getAttribute("data-tile-id")),

@@ -23,3 +23,6 @@
 - [x] Let players drag and reorder their own concealed tiles while preserving that local order through live updates.
 - [x] Color player cards by seat, highlight the active discard player, and label waiting/observing seats.
 - [x] Add a results-view option to reveal the other players' concealed hands only after hand completion.
+- [x] Keep the viewer's hand in one lower rack; the results toggle reveals opponents only, never a duplicate viewer hand.
+- [x] Add a deterministic Sort hand control for the viewer's concealed tiles.
+- [x] Add a visible drag-to-reorder hint and tile grip affordance beside the hand controls.
