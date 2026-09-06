@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 6 — Add deterministic bots, deadlines, and disconnect recovery.
+Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 ## Environment checks (2026-09-05)
 
@@ -165,6 +165,18 @@ Milestone 6 — Add deterministic bots, deadlines, and disconnect recovery.
 - Added deterministic bot-policy tests, a 100-seed all-bot transition simulation with physical-tile/phase invariants, deadline boundary tests, claim timeout coverage, reconnect cancellation, and all-human-disconnect completion coverage.
 - Verification after implementation: formatting, strict typecheck, lint, production build, 77 Vitest tests, and the default Chromium Playwright suite pass. Firefox remains deferred at the user's direction.
 
+## Milestone 6 checkpoint
+
+- Independent review was requested twice but could not run because the reviewer agent exhausted its usage limit. Local review and all available automated verification were completed.
+- Checkpoint commit `a977c28` (`feat: add bots and disconnect recovery`) was pushed to the private repository on branch `codex/mahjong-together`.
+
+## Milestone 7 implementation in progress
+
+- The active task is now explicitly updated to create the actual playable interface requested by the user: a real table view, visible local SVG tile art, hand selection/discard controls, claim/win/kong actions, server deadline display, reconnect/controller status, and hand results.
+- The table is responsive down to narrow mobile widths, uses 44px-or-larger controls, keeps opponent concealed tiles private, exposes a native keyboard-accessible help panel, and renders public discards/meld context plus the current wall count.
+- Added a Chromium end-to-end flow that starts a hand with bots, verifies 14 visible tile faces, selects a tile, enables the discard action, sends it through the live Socket.IO command path, and confirms the table remains synchronized.
+- Verification: formatting, strict typecheck, lint, production build, 77 Vitest tests, and all 5 Chromium Playwright flows pass. Firefox remains deferred at the user's direction.
+
 ## Next exact step
 
-Complete the independent Milestone 6 read-only review, correct any confirmed findings, checkpoint the bot/recovery work, then update the active task to Milestone 7 and build the real playable table UI with visible local SVG tiles and controls.
+Checkpoint the playable UI, then continue with integrated desktop/mobile browser verification and rematch/deployment work.

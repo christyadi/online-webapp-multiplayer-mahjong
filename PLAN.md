@@ -5,7 +5,7 @@
 - [x] 3. Implement and invariant-test the pure hand state machine, all claims and kongs, final-wall behavior, and dealer rotation.
 - [x] 4. Implement guest sessions, private room lobby, seats, host transfer, readiness, capacity, expiry, and browser lobby flows.
 - [x] 5. Implement reliable multiplayer queues, validation, decision IDs, acknowledgements/deduplication, private snapshots, origins, sizes, and rate limits.
-- [ ] 6. Implement deterministic bots, timeouts, disconnect takeover/rejoin, duplicate-tab control, restart behavior, and 100 simulations.
+- [x] 6. Implement deterministic bots, timeouts, disconnect takeover/rejoin, duplicate-tab control, restart behavior, and 100 simulations.
 - [ ] 7. Complete the responsive, accessible playable interface, local SVG tile art, help, reconnect, results, and rematches.
 - [ ] 8. Verify integrated two-human/two-bot play across desktop engines and mobile Chromium, including reconnect and rematch.
 - [ ] 9. Create the private GitHub repository and one zero-spend Render Free service; verify the public page, health, sockets, invite deep links, reconnect, and hand/rematch.

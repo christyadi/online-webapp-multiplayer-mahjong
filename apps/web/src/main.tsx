@@ -1,9 +1,12 @@
 import {
   apiErrorSchema,
+  commandAcknowledgementSchema,
   currentRoomResponseSchema,
   gameSnapshotSchema,
   lobbyMutationAcknowledgementSchema,
   roomCodeSchema,
+  type CommandAcknowledgement,
+  type GameCommand,
   type GameSnapshot,
   type RoomView,
 } from "@mahjong-together/shared";
@@ -14,6 +17,7 @@ import { io, type Socket } from "socket.io-client";
 import { LatestRequestGate } from "./request-gate.js";
 import { ServerStateProvider, useServerState } from "./server-state.js";
 import "./styles.css";
+import { TileArt } from "./tile-art.js";
 
 const controllerId = crypto.randomUUID();
 
@@ -28,6 +32,7 @@ function App() {
   const occupiedRoomCode = useRef<string | null>(null);
   const roomRequests = useRef(new LatestRequestGate());
   const realtime = useRef<Socket | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [realtimeReady, setRealtimeReady] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
 
@@ -97,10 +102,14 @@ function App() {
     });
     realtime.current = socket;
     socket.on("connect", () => {
+      setSocket(socket);
       setRealtimeReady(true);
       setError(null);
     });
-    socket.on("disconnect", () => setRealtimeReady(false));
+    socket.on("disconnect", () => {
+      setRealtimeReady(false);
+      setSocket((current) => (current === socket ? null : current));
+    });
     socket.on("connect_error", (caught) => setError(errorMessage(caught)));
     socket.on("room:changed", () => {
       void refreshRoom().catch((caught: unknown) => setError(errorMessage(caught)));
@@ -117,6 +126,7 @@ function App() {
     socket.connect();
     return () => {
       if (realtime.current === socket) realtime.current = null;
+      setSocket((current) => (current === socket ? null : current));
       socket.disconnect();
     };
   }, [dispatch, refreshRoom, sessionReady]);
@@ -187,6 +197,7 @@ function App() {
         onRefresh={refreshRoom}
         pending={pending}
         game={game}
+        realtime={socket}
         room={room}
         setPending={setPending}
       />
@@ -353,6 +364,7 @@ type LobbyProperties = Readonly<{
   onInvalidateRoomRequests: () => void;
   onRefresh: () => Promise<void>;
   pending: boolean;
+  realtime: Socket | null;
   room: RoomView;
   setPending: (pending: boolean) => void;
 }>;
@@ -366,6 +378,7 @@ function Lobby({
   onInvalidateRoomRequests,
   onRefresh,
   pending,
+  realtime,
   room,
   setPending,
 }: LobbyProperties) {
@@ -374,6 +387,20 @@ function Lobby({
   const viewer = room.seats[room.viewerSeat];
   const viewerIsHost = viewer?.kind === "human" && viewer.host;
   const inviteUrl = `${window.location.origin}/room/${room.code}`;
+
+  if (room.phase === "active" && game !== null) {
+    return (
+      <Table
+        error={error}
+        game={game}
+        key={`${game.handId}:${String(game.decisionId ?? game.roomRevision)}`}
+        onError={onError}
+        onLeave={onLeave}
+        realtime={realtime}
+        room={room}
+      />
+    );
+  }
 
   const mutate = async (path: string, body: Record<string, unknown>) => {
     setPending(true);
@@ -530,6 +557,337 @@ function StatusCard({ title, message }: Readonly<{ message: string; title: strin
       </section>
     </main>
   );
+}
+
+type TableProperties = Readonly<{
+  error: string | null;
+  game: GameSnapshot;
+  onError: (message: string | null) => void;
+  onLeave: () => void;
+  realtime: Socket | null;
+  room: RoomView;
+}>;
+
+function Table({ error, game, onError, onLeave, realtime, room }: TableProperties) {
+  const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
+  const [commandPending, setCommandPending] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
+  const viewer = game.players.find((player) => player.seat === game.viewerSeat);
+  const legal = game.legalActions;
+  const deadlineRemaining =
+    game.deadline === null
+      ? null
+      : Math.max(0, game.deadline - game.serverTime - (clock - game.serverTime));
+  const seconds = deadlineRemaining === null ? null : Math.ceil(deadlineRemaining / 1000);
+
+  useEffect(() => {
+    if (game.phase === "hand-ended" || game.deadline === null) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [game.deadline, game.phase]);
+
+  if (viewer === undefined)
+    return <StatusCard message="Your seat is unavailable." title="Table error" />;
+
+  const send = (action: GameCommand["action"]) => {
+    if (realtime === null || !realtime.connected || game.decisionId === null || commandPending)
+      return;
+    setCommandPending(true);
+    onError(null);
+    const command: GameCommand = {
+      action,
+      commandId: crypto.randomUUID(),
+      decisionId: game.decisionId,
+      handId: game.handId,
+      roomId: game.roomId,
+    };
+    realtime
+      .timeout(5_000)
+      .emit("game:command", command, (timeoutError: unknown, input: unknown) => {
+        setCommandPending(false);
+        if (timeoutError !== null && timeoutError !== undefined) {
+          onError("The table did not respond. Your hand will resync shortly.");
+          return;
+        }
+        const acknowledgement = commandAcknowledgementSchema.safeParse(input);
+        if (!acknowledgement.success) {
+          onError("The table sent an invalid response.");
+          return;
+        }
+        handleAcknowledgement(acknowledgement.data);
+      });
+  };
+
+  const handleAcknowledgement = (acknowledgement: CommandAcknowledgement) => {
+    if (!acknowledgement.ok) onError(acknowledgement.message);
+  };
+
+  return (
+    <main className="table-page">
+      <section className="table-shell" aria-labelledby="table-title">
+        <header className="table-header">
+          <div>
+            <p className="eyebrow">
+              Room {room.code} · {SEAT_NAMES[game.viewerSeat]}
+            </p>
+            <h1 id="table-title">Hand starting · Mahjong table</h1>
+          </div>
+          <div className="table-status" aria-live="polite">
+            <span>
+              {game.phase === "hand-ended" ? "Hand complete" : game.phase.replaceAll("-", " ")}
+            </span>
+            {seconds === null ? null : <strong>{seconds}s</strong>}
+          </div>
+        </header>
+
+        <div className="table-felt">
+          <div className="player-row opponents" aria-label="Other players">
+            {game.players
+              .filter((player) => player.seat !== game.viewerSeat)
+              .map((player) => (
+                <PlayerPanel game={game} key={player.seat} player={player} />
+              ))}
+          </div>
+          <div className="table-middle">
+            <div className="wall-counter">Wall · {game.wallCount}</div>
+            {game.pendingDiscard === null ? null : (
+              <div className="pending-discard">
+                Discarded tile <TileArt tile={game.pendingDiscard.tile} />
+              </div>
+            )}
+          </div>
+          <div className="player-row own-player">
+            <PlayerPanel game={game} player={viewer} />
+            <div className="hand-controls">
+              <div className="tile-rack" aria-label="Your concealed tiles">
+                {(viewer.concealedTiles ?? []).map((tile) => (
+                  <TileArt
+                    key={tile.id}
+                    onClick={() => setSelectedTileId(tile.id)}
+                    selected={selectedTileId === tile.id}
+                    tile={tile}
+                  />
+                ))}
+              </div>
+              <ActionBar
+                commandPending={commandPending}
+                game={game}
+                legal={legal}
+                onAction={send}
+                selectedTileId={selectedTileId}
+              />
+            </div>
+          </div>
+        </div>
+
+        {game.result === null ? null : <ResultBanner game={game} />}
+        <details className="help-panel">
+          <summary>How to play</summary>
+          <p>
+            Choose a tile, then discard it. When another player discards, claim with win, pung,
+            kong, chow, or pass. A green status means the server is in control of the hand.
+          </p>
+        </details>
+        {error === null ? null : (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="table-footer">
+          <p>
+            Live table · server revision {game.roomRevision} ·{" "}
+            {realtime?.connected ? "Connected" : "Reconnecting…"}
+          </p>
+          <button className="text-button" onClick={onLeave} type="button">
+            Leave game
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function PlayerPanel({
+  game,
+  player,
+}: Readonly<{ game: GameSnapshot; player: GameSnapshot["players"][number] }>) {
+  return (
+    <article className={`player-panel seat-${String(player.seat)}`}>
+      <div className="player-heading">
+        <strong>{player.nickname ?? `Bot ${seatName(player.seat)}`}</strong>
+        <span>{seatName(player.seat)}</span>
+      </div>
+      <small className="seat-detail">
+        {player.connected ? "Connected" : "Reconnecting"} ·{" "}
+        {player.controller === "bot" ? "Bot control" : "Human control"}
+      </small>
+      <div
+        className="opponent-tiles"
+        aria-label={`${player.nickname ?? "Bot"} has ${String(player.concealedCount)} concealed tiles`}
+      >
+        {player.seat === game.viewerSeat
+          ? null
+          : Array.from({ length: Math.min(player.concealedCount, 14) }, (_, index) => (
+              <span className="tile-back" key={index} />
+            ))}
+      </div>
+      <div className="discard-strip">
+        {player.discards.slice(-8).map((tile) => (
+          <TileArt key={tile.id} tile={tile} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ActionBar({
+  commandPending,
+  game,
+  legal,
+  onAction,
+  selectedTileId,
+}: Readonly<{
+  commandPending: boolean;
+  game: GameSnapshot;
+  legal: GameSnapshot["legalActions"];
+  onAction: (action: GameCommand["action"]) => void;
+  selectedTileId: string | null;
+}>) {
+  const disabled = commandPending || game.decisionId === null;
+  if (legal.kind === "none") return <p className="action-hint">Waiting for the table…</p>;
+  if (legal.kind === "discard") {
+    const canDiscard = selectedTileId !== null && legal.discardTileIds.includes(selectedTileId);
+    return (
+      <div className="action-bar">
+        <button
+          disabled={disabled || !canDiscard}
+          onClick={() =>
+            selectedTileId === null
+              ? undefined
+              : onAction({ kind: "discard", tileId: selectedTileId })
+          }
+          type="button"
+        >
+          {commandPending ? "Sending…" : "Discard selected"}
+        </button>
+        {legal.canWin ? (
+          <button
+            className="secondary"
+            disabled={disabled}
+            onClick={() => onAction({ kind: "declare-self-win" })}
+            type="button"
+          >
+            Win
+          </button>
+        ) : null}
+        {legal.concealedKongs.map((tileType) => (
+          <button
+            className="secondary"
+            disabled={disabled}
+            key={tileType}
+            onClick={() => onAction({ kind: "declare-concealed-kong", tileType })}
+            type="button"
+          >
+            Kong {tileType}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  if (legal.kind === "discard-claim")
+    return (
+      <div className="action-bar">
+        <button
+          disabled={disabled}
+          onClick={() => onAction({ choice: { kind: "pass" }, kind: "respond-to-discard" })}
+          type="button"
+        >
+          Pass
+        </button>
+        {legal.legal.canWin ? (
+          <button
+            disabled={disabled}
+            onClick={() => onAction({ choice: { kind: "win" }, kind: "respond-to-discard" })}
+            type="button"
+          >
+            Win
+          </button>
+        ) : null}
+        {legal.legal.canPung ? (
+          <button
+            className="secondary"
+            disabled={disabled}
+            onClick={() => onAction({ choice: { kind: "pung" }, kind: "respond-to-discard" })}
+            type="button"
+          >
+            Pung
+          </button>
+        ) : null}
+        {legal.legal.canKong ? (
+          <button
+            className="secondary"
+            disabled={disabled}
+            onClick={() => onAction({ choice: { kind: "kong" }, kind: "respond-to-discard" })}
+            type="button"
+          >
+            Kong
+          </button>
+        ) : null}
+        {legal.legal.chows.map((chow, index) => (
+          <button
+            className="secondary"
+            disabled={disabled}
+            key={index}
+            onClick={() =>
+              onAction({
+                choice: { kind: "chow", tileIds: chow.tileIds },
+                kind: "respond-to-discard",
+              })
+            }
+            type="button"
+          >
+            Chow
+          </button>
+        ))}
+      </div>
+    );
+  return (
+    <div className="action-bar">
+      <button
+        disabled={disabled}
+        onClick={() => onAction({ choice: "pass", kind: "respond-to-kong-robbery" })}
+        type="button"
+      >
+        Pass
+      </button>
+      <button
+        disabled={disabled}
+        onClick={() => onAction({ choice: "win", kind: "respond-to-kong-robbery" })}
+        type="button"
+      >
+        Win
+      </button>
+    </div>
+  );
+}
+
+function ResultBanner({ game }: Readonly<{ game: GameSnapshot }>) {
+  const result = game.result;
+  if (result === null) return null;
+  return (
+    <div className="result-banner">
+      <strong>{result.kind === "draw" ? "Draw hand" : `${seatName(result.winner)} wins`}</strong>
+      <span>
+        {result.kind === "draw"
+          ? "The wall is empty."
+          : `Win by ${result.source.replaceAll("-", " ")}.`}
+      </span>
+    </div>
+  );
+}
+
+function seatName(seat: number): string {
+  return SEAT_NAMES[seat as 0 | 1 | 2 | 3];
 }
 
 async function requestJson<T>(
