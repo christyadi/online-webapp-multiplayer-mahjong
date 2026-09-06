@@ -258,6 +258,8 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Player review found that **Hand starting · Mahjong table** adds no useful information during gameplay; remove the visible heading and retain only compact, actionable table context.
 - The table currently feels simultaneously too empty and too clustered. Future refinement should stabilize the felt footprint, reduce outer whitespace, strengthen the central discard/empty state, and add a discard-owner legend.
 - Future refinement should combine the local player card, hand, and legal actions into a bottom interaction dock, make active status legible through text plus high-contrast treatment and timer/progress, and keep end-of-hand reveals in an overlay or expandable panel.
+- New player feedback: turn ownership is still difficult to perceive, and public actions such as another player's discard need a visible activity cue. Future work should add an animated or otherwise prominent active-seat indicator, a readable latest-action/event cue, and an accessible live-region equivalent; motion must respect reduced-motion preferences.
+- New player feedback: add a restrained confetti or equivalent winner effect at hand completion, with a static fallback that does not obscure the result or controls.
 - The revised hierarchy must be checked at desktop, tablet, and both phone orientations without introducing page scroll during a normal turn. Firefox remains deferred at the user's direction.
 
 ## Next exact step

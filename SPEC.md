@@ -210,5 +210,7 @@ The following post-release improvements were captured from player feedback on Se
 - Give the four-sided felt a stable aspect ratio and predictable footprint, reduce unused shell padding, and preserve a prominent central discard area with an explained empty state and discard-owner legend.
 - Group the local player card, hand rack, and legal actions into a bottom interaction dock. Keep the rack primary, reveal actions contextually, and reduce persistent instructional chrome.
 - Make active-player status unmistakable with text, high-contrast border/glow, and timer/progress treatment; never rely on seat color alone.
+- Make turn ownership and public activity unmistakable with a persistent active-seat label, a restrained animated active-card treatment, and a readable latest-action cue (for example, **West discarded 5 of bamboo**). Public discards should have a short origin-to-pool motion or static equivalent, and the same action must be announced through an accessible live region. Respect `prefers-reduced-motion`.
+- Add a restrained winner celebration such as confetti when a hand ends, tied to the winner and result presentation without covering controls or tiles. Provide a static/reduced-motion fallback.
 - Present opponent-hand reveals in an overlay or expandable panel that preserves table geometry and keeps the local hand accessible.
 - Recheck hierarchy, reachability, and scroll behavior at desktop, tablet, and both required phone orientations, while retaining the existing 44×44 CSS-pixel control target and reduced-motion behavior.
