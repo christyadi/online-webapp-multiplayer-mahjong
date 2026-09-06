@@ -6,7 +6,7 @@ Visual-design and UX refinement are the active priorities. Public deployment is 
 
 - [x] Complete the visual-direction and UX-refinement work below.
 - [x] Verify the completed experience across the required viewports and assistive paths.
-- [ ] Hand off the preserved deployment configuration to the user for manual setup.
+- [x] Preserve the deployment configuration for the user's later manual setup in `DEPLOYMENT.md`.
 - [ ] Resume public-service verification only after the user provides a deployed URL.
 
 - [x] 1. Establish isolated repository, Ponytail guidance, exact toolchain, workspaces, repeatable commands, health route, production serving, review, and checkpoint commit.
@@ -68,6 +68,10 @@ The attached HTML concepts and design-system note are recorded in [DESIGN.md](./
 - [x] Make rules and end-hand inspection true keyboard dialogs: mount above the application surface, make background controls inert, contain Tab focus, support Escape, and restore the owning control on close.
 - [x] Keep every interactive control at least 44×44 CSS pixels at touch breakpoints. Compress tile artwork and permit only intentional internal scrolling rather than shrinking targets.
 - [x] Support hand reordering with mouse drag, a dedicated non-scrolling touch drag grip, and keyboard selection plus adjacent move controls; retain a concise visible affordance.
+
+## Visual refinement review gate (2026-09-07)
+
+- [x] Independent corrected re-review found no unresolved critical, high, or medium issue. It explicitly checked the phone touch drag grip, readable compact meld summaries, 44px controls including the fixed theme toggle, dialog isolation, dark contrast, and header reachability.
 
 ## Future UX refinement backlog (captured 2026-09-06)
 

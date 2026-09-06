@@ -289,6 +289,11 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - Corrected responsive/accessibility findings before review completion: compact exposed melds stay visible and pair physical tiles with readable names at both phone orientations; dialogs are portaled, background-inert, Tab-contained, Escape-closeable, and return focus to their owning controls; every visible control (including the fixed theme toggle) is at least 44×44; tiles can be reordered by mouse drag, a dedicated non-scrolling touch grip, or keyboard selection plus Move controls; dark status/rematch text has explicit high-contrast dark values. A header padding fix also keeps the rules trigger clear of the theme toggle on tablet/desktop.
 - Verification after correction: Prettier, strict typecheck, lint, all 89 unit/integration tests, production build, deterministic Chow/result/winner browser fixtures, and the normal table flow at desktop Chromium, 390×844 portrait Chromium, 844×390 landscape Chromium, iPad Pro 11 Chromium, and WebKit. The phone flow asserts all visible controls are at least 44×44 and dispatches a touch-pointer drag through the dedicated grip; the Chow fixture asserts visible, readable public meld names at both phone orientations. The normal-table flow asserts no document scroll, dialog focus containment/restoration, drawn-tile separation, keyboard tile movement, live activity, and in-game dark-mode usability. Firefox remains deferred at the user's direction.
 
+## Final visual review gate (2026-09-07)
+
+- A second independent, read-only corrected re-review found no remaining critical, high, or medium issue. It verified the dedicated `touch-action: none` touch grip preserves horizontal rack scrolling, the phone fixtures perform a touch-pointer reorder, meld summaries provide readable tile names, and the 44px check includes the fixed theme toggle and tile buttons.
+- The complete visual/design checkpoint is committed and pushed as `f617d1d` on `codex/mahjong-together`. The worktree was clean after the push.
+
 ## Next exact step
 
-Obtain the required independent corrected re-review, then hand off the completed design and plan work. The user will manually configure Render afterward; public verification resumes only once they provide the deployed URL. Firefox remains deferred.
+The completed design and plan work is ready for the user's manual Render configuration. Public verification resumes only once they provide the deployed URL. Firefox remains deferred.
