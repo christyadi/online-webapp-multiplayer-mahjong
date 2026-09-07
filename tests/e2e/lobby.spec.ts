@@ -160,6 +160,16 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await expect(host.locator("html")).toHaveAttribute("data-theme", nextTheme);
     await expect(host.locator(".table-felt")).toBeVisible();
     await expect(host.locator(".tile-rack .tile-art").first()).toBeVisible();
+    await expect(menuDialog.getByRole("radio", { name: "Chinese Classical" })).toBeChecked();
+    await menuDialog.getByRole("radio", { name: /^Classic\b/ }).check();
+    await expect(menuDialog.getByRole("radio", { name: /^Classic\b/ })).toBeChecked();
+    await expect(
+      host
+        .locator(
+          ".tile-rack .tile-classic-dots, .tile-rack .tile-classic-bamboo, .tile-rack .tile-classic-characters, .tile-rack .tile-classic-honor",
+        )
+        .first(),
+    ).toBeVisible();
     const tableRules = menuDialog.getByRole("button", { name: "How to play" });
     await tableRules.click();
     await expect(host.getByRole("dialog", { name: "How to play" })).toBeVisible();
@@ -176,6 +186,9 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await expect(menuDialog).toHaveCount(0);
     await host.reload();
     await expect(host.getByRole("heading", { name: "Mahjong table" })).toBeAttached();
+    await host.getByRole("button", { name: "Table menu" }).click();
+    await expect(host.getByRole("radio", { name: /^Classic\b/ })).toBeChecked();
+    await host.getByRole("button", { name: "Close Table menu" }).click();
     await expect(host.locator(".seat-position-south .tile-rack .tile-art")).toHaveCount(14);
     await expect(host.locator(".tile-rack .tile-art")).toHaveCount(14);
     await expect(host.locator(".tile-rack .tile-art").first()).toHaveAttribute(

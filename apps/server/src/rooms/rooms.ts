@@ -590,7 +590,7 @@ export class RoomStore {
     }
     if (resetDeadline || room.deadline === null) {
       this.cancelAutomation(room);
-      room.deadline = this.#clock() + (hand.phase === "awaiting-discard" ? 30_000 : 10_000);
+      room.deadline = this.#clock() + (hand.phase === "awaiting-discard" ? 45_000 : 15_000);
       const capturedHandId = hand.handId;
       const capturedDecisionId = hand.decisionId;
       room.deadlineTimerCancel = this.#scheduler(Math.max(0, room.deadline - this.#clock()), () => {

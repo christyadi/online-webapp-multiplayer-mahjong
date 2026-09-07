@@ -30,7 +30,8 @@ import { io, type Socket } from "socket.io-client";
 import { LatestRequestGate } from "./request-gate.js";
 import { ServerStateProvider, useServerState } from "./server-state.js";
 import "./styles.css";
-import { TileArt } from "./tile-art.js";
+import { TileArt, TileArtworkProvider, type TileArtworkTheme } from "./tile-art.js";
+import { persistTileArtworkPreference, readTileArtworkPreference } from "./tile-art-preference.js";
 
 const OCCUPIED_ROOM_STORAGE_KEY = "mahjong-together:occupied-room";
 const THEME_STORAGE_KEY = "mahjong-together:theme";
@@ -38,6 +39,14 @@ const THEME_STORAGE_KEY = "mahjong-together:theme";
 type Theme = "light" | "dark";
 
 const HOME_TILE = { id: "decorative-bamboo-6", type: "b6" } as const;
+
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function readThemePreference(): Theme {
   try {
@@ -74,6 +83,9 @@ function ThemeToggle({
 
 function Root() {
   const [theme, setTheme] = useState<Theme>(() => readThemePreference());
+  const [tileArtwork, setTileArtwork] = useState<TileArtworkTheme>(() =>
+    readTileArtworkPreference(browserStorage()),
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -85,15 +97,33 @@ function Root() {
     }
   }, [theme]);
 
+  useEffect(() => {
+    persistTileArtworkPreference(browserStorage(), tileArtwork);
+  }, [tileArtwork]);
+
   return (
-    <App
-      onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-      theme={theme}
-    />
+    <TileArtworkProvider artwork={tileArtwork}>
+      <App
+        onChangeTileArtwork={setTileArtwork}
+        onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+        theme={theme}
+        tileArtwork={tileArtwork}
+      />
+    </TileArtworkProvider>
   );
 }
 
-function App({ onToggleTheme, theme }: Readonly<{ onToggleTheme: () => void; theme: Theme }>) {
+function App({
+  onChangeTileArtwork,
+  onToggleTheme,
+  theme,
+  tileArtwork,
+}: Readonly<{
+  onChangeTileArtwork: (artwork: TileArtworkTheme) => void;
+  onToggleTheme: () => void;
+  theme: Theme;
+  tileArtwork: TileArtworkTheme;
+}>) {
   const { dispatch, state: serverState } = useServerState();
   const { game, room } = serverState;
   const [error, setError] = useState<string | null>(null);
@@ -324,6 +354,8 @@ function App({ onToggleTheme, theme }: Readonly<{ onToggleTheme: () => void; the
       <Lobby
         controllerId={controllerId}
         error={error}
+        game={game}
+        onChangeTileArtwork={onChangeTileArtwork}
         onError={setError}
         onExpired={expireRoom}
         onToggleTheme={onToggleTheme}
@@ -338,11 +370,11 @@ function App({ onToggleTheme, theme }: Readonly<{ onToggleTheme: () => void; the
         onInvalidateRoomRequests={() => roomRequests.current.invalidate()}
         onRefresh={refreshRoom}
         pending={pending}
-        game={game}
         realtime={socket}
         room={room}
         setPending={setPending}
         theme={theme}
+        tileArtwork={tileArtwork}
       />
     );
   }
@@ -667,6 +699,7 @@ type LobbyProperties = Readonly<{
   controllerId: string;
   error: string | null;
   game: GameSnapshot | null;
+  onChangeTileArtwork: (artwork: TileArtworkTheme) => void;
   onError: (message: string | null) => void;
   onExpired: () => void;
   onLeave: () => void;
@@ -678,12 +711,14 @@ type LobbyProperties = Readonly<{
   room: RoomView;
   setPending: (pending: boolean) => void;
   theme: Theme;
+  tileArtwork: TileArtworkTheme;
 }>;
 
 function Lobby({
   controllerId,
   error,
   game,
+  onChangeTileArtwork,
   onError,
   onExpired,
   onLeave,
@@ -695,6 +730,7 @@ function Lobby({
   room,
   setPending,
   theme,
+  tileArtwork,
 }: LobbyProperties) {
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [manualCopy, setManualCopy] = useState(false);
@@ -754,6 +790,7 @@ function Lobby({
         error={error}
         game={game}
         canPlayAgain={viewerIsHost}
+        onChangeTileArtwork={onChangeTileArtwork}
         onError={onError}
         onLeave={leaveGame}
         onPlayAgain={() => void mutate(`/api/rooms/${room.code}/start`, {})}
@@ -762,6 +799,7 @@ function Lobby({
         realtime={realtime}
         room={room}
         theme={theme}
+        tileArtwork={tileArtwork}
       />
     );
   }
@@ -875,7 +913,13 @@ function Lobby({
           {manualCopy ? <input aria-label="Invite link" readOnly value={inviteUrl} /> : null}
         </div>
 
-        <button className="text-button" disabled={pending} onClick={leaveGame} type="button">
+        <button
+          className="text-button"
+          disabled={pending}
+          onClick={leaveGame}
+          type="button"
+          color="danger"
+        >
           Leave game
         </button>
         {error === null ? null : (
@@ -916,6 +960,7 @@ type TableProperties = Readonly<{
   canPlayAgain: boolean;
   error: string | null;
   game: GameSnapshot;
+  onChangeTileArtwork: (artwork: TileArtworkTheme) => void;
   onError: (message: string | null) => void;
   onLeave: () => void;
   onPlayAgain: () => void;
@@ -924,12 +969,14 @@ type TableProperties = Readonly<{
   realtime: Socket | null;
   room: RoomView;
   theme: Theme;
+  tileArtwork: TileArtworkTheme;
 }>;
 
 function Table({
   canPlayAgain,
   error,
   game,
+  onChangeTileArtwork,
   onError,
   onLeave,
   onPlayAgain,
@@ -938,6 +985,7 @@ function Table({
   realtime,
   room,
   theme,
+  tileArtwork,
 }: TableProperties) {
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
@@ -1310,6 +1358,7 @@ function Table({
           <TableMenu
             connected={realtime?.connected ?? false}
             onClose={() => setShowTableMenu(false)}
+            onChangeTileArtwork={onChangeTileArtwork}
             onLeave={onLeave}
             onShowRules={() => {
               setShowTableMenu(false);
@@ -1317,6 +1366,7 @@ function Table({
             }}
             onToggleTheme={onToggleTheme}
             theme={theme}
+            tileArtwork={tileArtwork}
           />
         ) : null}
         {showRules ? (
@@ -1500,17 +1550,21 @@ function RulesDialog({ onClose }: Readonly<{ onClose: () => void }>) {
 function TableMenu({
   connected,
   onClose,
+  onChangeTileArtwork,
   onLeave,
   onShowRules,
   onToggleTheme,
   theme,
+  tileArtwork,
 }: Readonly<{
   connected: boolean;
   onClose: () => void;
+  onChangeTileArtwork: (artwork: TileArtworkTheme) => void;
   onLeave: () => void;
   onShowRules: () => void;
   onToggleTheme: () => void;
   theme: Theme;
+  tileArtwork: TileArtworkTheme;
 }>) {
   return (
     <TableDialog id="table-menu" onClose={onClose} title="Table menu">
@@ -1520,6 +1574,7 @@ function TableMenu({
       </p>
       <div className="table-menu-actions">
         <ThemeToggle className="table-menu-theme-toggle" onToggle={onToggleTheme} theme={theme} />
+        <TileArtworkPicker artwork={tileArtwork} onChange={onChangeTileArtwork} />
         <button aria-controls="table-rules" onClick={onShowRules} type="button">
           <span aria-hidden="true">?</span> How to play
         </button>
@@ -1528,6 +1583,43 @@ function TableMenu({
         </button>
       </div>
     </TableDialog>
+  );
+}
+
+function TileArtworkPicker({
+  artwork,
+  onChange,
+}: Readonly<{ artwork: TileArtworkTheme; onChange: (artwork: TileArtworkTheme) => void }>) {
+  return (
+    <fieldset className="tile-artwork-picker">
+      <legend>Tile style</legend>
+      <label>
+        <input
+          checked={artwork === "chinese-classical"}
+          name="tile-artwork"
+          onChange={() => onChange("chinese-classical")}
+          type="radio"
+          value="chinese-classical"
+        />
+        <span>
+          <strong>Chinese Classical</strong>
+          <small>Traditional Chinese-inspired marks</small>
+        </span>
+      </label>
+      <label>
+        <input
+          checked={artwork === "classic"}
+          name="tile-artwork"
+          onChange={() => onChange("classic")}
+          type="radio"
+          value="classic"
+        />
+        <span>
+          <strong>Classic</strong>
+          <small>Original simplified tile faces</small>
+        </span>
+      </label>
+    </fieldset>
   );
 }
 

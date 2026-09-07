@@ -53,7 +53,7 @@
   --primary-hover: #b0d5ef;
   --primary-text: #102434;
   --focus: #b9e5ff;
-  --danger: #ff9b9b;
+  --danger: #a12828;
   --table: #073423;
   --table-dark: #041f14;
   --table-border: #2b170c;
@@ -1003,40 +1003,103 @@ a {
   stroke-linecap: round;
   stroke-width: 1.2;
 }
-.tile-rank {
-  fill: #826f46;
-  font-size: 7px;
-  font-weight: 700;
+.tile-dot {
+  stroke-width: 0.85;
 }
-.tile-dots circle {
+.tile-dot-red {
+  fill: #bb332d;
+  stroke: #761b1b;
+}
+.tile-dot-blue {
+  fill: #245c91;
+  stroke: #153c66;
+}
+.tile-dot-green {
+  fill: #277449;
+  stroke: #17482e;
+}
+.tile-pip-highlight {
+  fill: rgb(255 255 255 / 52%);
+  stroke: none;
+}
+.tile-bamboo use,
+.tile-characters use,
+.tile-honor-mark,
+.tile-white-dragon,
+.tile-bamboo-bird {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tile-bamboo use {
+  stroke: #267348;
+  stroke-width: 1.55;
+}
+.tile-characters text {
+  stroke: #a42e29;
+  fill: #a42e29;
+  font-size: 28px;
+  font-weight: 800;
+}
+.tile-honor-mark {
+  stroke-width: 2.1;
+}
+.tile-honor-east,
+.tile-honor-south,
+.tile-honor-west,
+.tile-honor-north {
+  stroke: #245c91;
+}
+.tile-honor-red {
+  stroke: #b22c27;
+}
+.tile-honor-green {
+  stroke: #277449;
+}
+.tile-white-dragon {
+  fill: rgb(255 255 255 / 35%);
+  stroke: #2c6599;
+  stroke-width: 2.2;
+}
+.tile-bamboo-bird {
+  stroke: #276f47;
+  stroke-width: 1.55;
+}
+.tile-classic-dots circle {
   fill: #b43333;
   stroke: #791d1d;
   stroke-width: 1;
 }
-.tile-bamboo path {
+.tile-classic-rank {
+  fill: #826f46;
+  font-size: 7px;
+  font-weight: 700;
+}
+.tile-classic-bamboo path {
+  fill: none;
   stroke: #27734d;
   stroke-linecap: round;
   stroke-width: 4;
 }
-.tile-characters text {
+.tile-classic-characters text {
   fill: #1d4e89;
   font-size: 19px;
   font-weight: 800;
 }
-.tile-characters path {
+.tile-classic-characters path {
   fill: none;
   stroke: #1d4e89;
   stroke-width: 2;
 }
-.tile-honor {
+.tile-classic-honor {
   fill: #b43333;
   font-size: 30px;
   font-weight: 800;
 }
-.tile-green {
+.tile-classic-green {
   fill: #22764c;
 }
-.tile-white {
+.tile-classic-white {
   fill: #525e6b;
 }
 .tile-button .is-selected {
@@ -1225,6 +1288,55 @@ a {
   justify-content: center;
   width: 100%;
   border-radius: 0.65rem;
+}
+
+.tile-artwork-picker {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.65rem;
+  padding: 0.5rem;
+}
+
+.tile-artwork-picker legend {
+  padding-inline: 0.25rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.tile-artwork-picker label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+}
+
+.tile-artwork-picker label:has(input:checked) {
+  background: var(--surface-alt);
+}
+
+.tile-artwork-picker input {
+  width: 1rem;
+  min-height: 1rem;
+}
+
+.tile-artwork-picker span {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.tile-artwork-picker strong {
+  font-size: 0.88rem;
+}
+
+.tile-artwork-picker small {
+  color: var(--muted);
+  font-size: 0.74rem;
 }
 
 .table-menu-leave {

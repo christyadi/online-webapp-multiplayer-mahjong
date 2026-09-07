@@ -33,6 +33,8 @@ Mahjong Together should feel like sitting down at a cared-for physical table: ta
 
 - Use the existing system sans stack for UI text.
 - Use the existing locally bundled SVG tile art for every tile face and back; do not add a dependency on external fonts or Mahjong Unicode glyph support.
+- The shipped `chinese-classical` face set is original inline SVG: Chinese-style numeral/萬 character faces, mixed-color circle pips, bamboo marks with a bird 1-bamboo, and 東/南/西/北/中/發 honors. Its typed artwork registry is intentionally internal; a future regional set must provide all 34 faces and its own local SVG symbols before it is selectable.
+- Players may choose their personal tile appearance from the table menu. `chinese-classical` is the default; `classic` retains the former simplified dots, bamboo, Arabic numeral, and letter-honor faces. This browser-local preference affects only the viewer’s rendering and is not room or game state.
 - A brush-like mark may be used sparingly for a logo or wind marker only if it is locally available and remains decorative. Never use it for paragraphs, rules, or controls.
 - Do not add sound, music, external image/font requests, or autoplay media. The supplied “clack” interaction is a visual reference only.
 
