@@ -6,7 +6,9 @@ services:
     region: frankfurt
     branch: codex/mahjong-together
     autoDeployTrigger: "off"
-    buildCommand: npm ci && npm run build
+    # TypeScript/Vite and declaration packages are dev dependencies, so include them
+    # explicitly while NODE_ENV=production is set for the service.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:

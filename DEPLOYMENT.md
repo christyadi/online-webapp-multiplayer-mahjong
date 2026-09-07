@@ -10,7 +10,7 @@ Deployment is intentionally deferred while the visual-design direction and imple
 
 - Runtime: Node
 - Node version: 24.20.0
-- Build command: `npm ci && npm run build`
+- Build command: `npm ci --include=dev && npm run build`
 - Start command: `npm start`
 - Health check: `/api/health`
 - Environment: `NODE_ENV=production` and `APP_ORIGIN` set to the assigned Render HTTPS URL
@@ -20,3 +20,7 @@ Deployment is intentionally deferred while the visual-design direction and imple
 Before creation, verify that the account's spending controls guarantee no billable overage without changing unrelated services. The public URL and exact redeployment/stop instructions will be added only after real deployment; they will not be invented.
 
 Free-tier startup delays, quotas, and interrupted availability are accepted. All guest sessions and game rooms are in memory, so a server restart ends active games.
+
+## Build dependency note
+
+Keep `NODE_ENV=production` for the service, but include development dependencies in the build command. The shared package, Vite web bundle, and server TypeScript compilation use the repository's TypeScript toolchain and declaration packages (including `@types/express`), which npm otherwise omits when `NODE_ENV=production` is set. If the Render dashboard has a manually entered command, replace `npm ci; npm run build` or `npm ci && npm run build` with `npm ci --include=dev && npm run build`.
