@@ -4,7 +4,7 @@ The release target is one Render Free Node web service connected to the new priv
 
 ## Current status
 
-Deployment is intentionally deferred while the visual-design direction and implementation plan are completed. The user will manually configure Render afterward. This document preserves the required settings; do not create a service, request provider access, or claim public verification during the refinement phase.
+Deployments run from the `deployment` branch through the GitHub Actions **Verify and deploy** workflow. It runs formatting, lint, type checking, unit/integration tests, a production build, and Chromium end-to-end tests before it triggers Render. The workflow does not create or configure a Render service.
 
 ## Render settings
 
@@ -14,10 +14,15 @@ Deployment is intentionally deferred while the visual-design direction and imple
 - Start command: `npm start`
 - Health check: `/api/health`
 - Environment: `NODE_ENV=production` and `APP_ORIGIN` set to the assigned Render HTTPS URL
-- Deploy mode after initial release: manual; automatic deployments disabled
+- Connected branch: `deployment`
+- Deploy mode: manual/Off in Render; GitHub Actions triggers deployment only after its verification job succeeds
 - Region: Frankfurt when offered for Free services, otherwise the provider default
 
 Before creation, verify that the account's spending controls guarantee no billable overage without changing unrelated services. The public URL and exact redeployment/stop instructions will be added only after real deployment; they will not be invented.
+
+## GitHub Actions deployment secret
+
+After the Render service exists, copy its deploy hook URL from **Settings** and save it as the GitHub repository Actions secret `RENDER_DEPLOY_HOOK_URL`. The URL is a credential and must never be committed. Pushing to `deployment` then runs the verification job and sends one POST request to that secret URL only when every check passes.
 
 Free-tier startup delays, quotas, and interrupted availability are accepted. All guest sessions and game rooms are in memory, so a server restart ends active games.
 

@@ -3,8 +3,8 @@ services:
     name: mahjong-together
     runtime: node
     plan: free
-    region: frankfurt
-    branch: codex/mahjong-together
+    region: singapore
+    branch: deployment
     autoDeployTrigger: "off"
     # TypeScript/Vite and declaration packages are dev dependencies, so include them
     # explicitly while NODE_ENV=production is set for the service.
