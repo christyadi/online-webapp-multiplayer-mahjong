@@ -391,7 +391,7 @@ a {
 
 .table-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: clamp(0.45rem, 1vw, 0.85rem);
   width: 100%;
   height: 100dvh;
@@ -411,7 +411,6 @@ a {
 }
 
 .table-header,
-.table-footer,
 .player-heading {
   display: flex;
   align-items: center;
@@ -505,23 +504,7 @@ a {
   line-height: 1;
 }
 
-.table-help-trigger {
-  display: grid;
-  width: 2.75rem;
-  min-width: 2.75rem;
-  height: 2.75rem;
-  min-height: 2.75rem;
-  place-items: center;
-  border: 1px solid var(--brass-light);
-  border-radius: 50%;
-  padding: 0;
-  color: var(--wood-dark);
-  background: var(--brass);
-  font-size: 1.25rem;
-  font-weight: 900;
-}
-
-.table-theme-toggle,
+.table-menu-trigger,
 .table-result-trigger {
   flex: 0 0 auto;
   min-height: 2.75rem;
@@ -531,13 +514,14 @@ a {
   box-shadow: none;
 }
 
-.table-theme-toggle {
-  position: static;
-  z-index: auto;
+.table-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.45rem 0.65rem;
 }
 
-.table-theme-toggle:hover,
+.table-menu-trigger:hover,
 .table-result-trigger:hover {
   color: var(--table-text);
   background: rgb(255 255 255 / 15%);
@@ -744,18 +728,6 @@ a {
   border-radius: 0.35rem;
   padding: 0.2rem;
   background: color-mix(in srgb, var(--surface) 42%, transparent);
-}
-.meld-name {
-  display: block;
-  color: var(--player-panel-muted);
-  font-size: 0.65rem;
-  font-weight: 750;
-  text-align: center;
-  text-transform: uppercase;
-}
-.meld-summary {
-  display: none;
-  color: var(--player-panel-text);
 }
 .meld-tiles {
   display: flex;
@@ -1141,20 +1113,6 @@ a {
   font: inherit;
   font-weight: 650;
 }
-.table-footer {
-  min-height: 2.5rem;
-  border-top: 1px solid rgb(241 227 172 / 35%);
-  padding: 0.25rem 0.2rem 0;
-  color: var(--brass-light);
-  font-size: 0.85rem;
-}
-.table-footer p {
-  margin: 0;
-}
-.table-footer .text-button {
-  margin-top: 0;
-}
-
 .table-dialog-backdrop {
   position: fixed;
   z-index: 40;
@@ -1248,6 +1206,30 @@ a {
 .dialog-intro {
   margin: 0.85rem 0;
   color: var(--muted);
+}
+
+.table-menu-connection {
+  margin: 0 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.table-menu-actions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.table-menu-theme-toggle {
+  position: static;
+  z-index: auto;
+  justify-content: center;
+  width: 100%;
+  border-radius: 0.65rem;
+}
+
+.table-menu-leave {
+  color: #fff7ef;
+  background: var(--danger);
 }
 
 .opponent-hand-grid {
@@ -1527,18 +1509,14 @@ p {
     width: 1.95rem;
     height: 1.95rem;
   }
-  .table-help-trigger {
+  .table-menu-trigger {
     width: 2.75rem;
     min-width: 2.75rem;
     height: 2.75rem;
     min-height: 2.75rem;
-  }
-  .table-theme-toggle {
-    width: 2.75rem;
-    min-width: 2.75rem;
     padding: 0;
   }
-  .table-theme-toggle > span:last-child {
+  .table-menu-trigger > span:last-child {
     display: none;
   }
   .table-result-trigger {
@@ -1612,16 +1590,6 @@ p {
   .meld-group {
     flex: 0 0 auto;
     padding: 0.08rem;
-  }
-  .meld-name {
-    font-size: 0.68rem;
-  }
-  .meld-summary {
-    display: block;
-    color: var(--player-panel-text);
-    font-size: 0.68rem;
-    line-height: 1.25;
-    white-space: nowrap;
   }
   .meld-tiles {
     gap: 0.04rem;
@@ -1713,15 +1681,6 @@ p {
   .action-hint {
     font-size: 0.66rem;
   }
-  .table-footer {
-    min-height: 2rem;
-    font-size: 0.68rem;
-  }
-  .table-footer .text-button {
-    min-height: 2.75rem;
-    padding: 0.15rem 0.35rem;
-    font-size: 0.66rem;
-  }
   .result-dialog {
     padding: 0.75rem;
   }
@@ -1754,7 +1713,7 @@ p {
     width: 1.8rem;
     height: 1.8rem;
   }
-  .table-help-trigger {
+  .table-menu-trigger {
     width: 2.75rem;
     min-width: 2.75rem;
     height: 2.75rem;
@@ -1784,16 +1743,6 @@ p {
   .meld-group {
     flex: 0 0 auto;
     padding: 0.06rem;
-  }
-  .meld-name {
-    font-size: 0.65rem;
-  }
-  .meld-summary {
-    display: block;
-    color: var(--player-panel-text);
-    font-size: 0.65rem;
-    line-height: 1.2;
-    white-space: nowrap;
   }
   .meld-tiles {
     gap: 0.04rem;

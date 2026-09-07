@@ -2,7 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 
 test("a player chooses one Chow option and every player sees the exposed meld", async ({
   browser,
-}, testInfo) => {
+}) => {
   const contexts: BrowserContext[] = [];
   try {
     const host = await newGuestPage(browser, contexts);
@@ -34,25 +34,16 @@ test("a player chooses one Chow option and every player sees the exposed meld", 
     await chow.click();
 
     await expect(friend.getByText("Playing · choose discard")).toBeVisible();
-    await expect(friend.getByLabel("Claimant exposed melds")).toContainText("Chow");
-    if (testInfo.project.name.includes("phone")) {
-      await expect(friend.locator(".player-panel.seat-1 .meld-strip")).toBeVisible();
-      await expect(friend.locator(".player-panel.seat-1 .meld-summary")).toHaveText(
-        "2 of dots · 4 of dots · 3 of dots",
-      );
-      await expect(friend.locator(".player-panel.seat-1 .meld-summary")).toBeVisible();
-    }
+    await expect(friend.locator(".table-activity")).toContainText("Claimant called Chow.");
+    await expect(friend.getByLabel("Claimant melds")).toBeVisible();
     await expect(friend.locator(".player-panel.seat-1 .meld-tiles .tile-art")).toHaveCount(3);
+    await expect(friend.locator(".player-panel.seat-1 .meld-name")).toHaveCount(0);
+    await expect(friend.locator(".player-panel.seat-1 .meld-summary")).toHaveCount(0);
     await expectExposedMiddleChow(friend);
-    await expect(host.getByLabel("Claimant exposed melds")).toContainText("Chow");
-    if (testInfo.project.name.includes("phone")) {
-      await expect(host.locator(".player-panel.seat-1 .meld-strip")).toBeVisible();
-      await expect(host.locator(".player-panel.seat-1 .meld-summary")).toHaveText(
-        "2 of dots · 4 of dots · 3 of dots",
-      );
-      await expect(host.locator(".player-panel.seat-1 .meld-summary")).toBeVisible();
-    }
+    await expect(host.getByLabel("Claimant melds")).toBeVisible();
     await expect(host.locator(".player-panel.seat-1 .meld-tiles .tile-art")).toHaveCount(3);
+    await expect(host.locator(".player-panel.seat-1 .meld-name")).toHaveCount(0);
+    await expect(host.locator(".player-panel.seat-1 .meld-summary")).toHaveCount(0);
     await expectExposedMiddleChow(host);
     await expect(friend.getByRole("alert")).toHaveCount(0);
     await expect(host.getByRole("alert")).toHaveCount(0);

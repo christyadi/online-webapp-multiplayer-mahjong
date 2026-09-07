@@ -20,6 +20,7 @@ export type PlayerHandState = {
 type HandBase = {
   dealer: SeatIndex;
   decisionSequence: number;
+  discardOrder?: string[];
   handId: string;
   players: [PlayerHandState, PlayerHandState, PlayerHandState, PlayerHandState];
   wall: PhysicalTile[];
@@ -136,6 +137,7 @@ export function startHand(
   const base: HandBase = {
     dealer,
     decisionSequence: 1,
+    discardOrder: [],
     handId,
     players: [
       { concealed: deal.hands[0], discards: [], melds: [] },
@@ -248,7 +250,9 @@ function transitionDiscardTurn(
 function discardTile(state: AwaitingDiscardState, tileId: string): TransitionResult {
   const tile = removeTileById(state.players[state.turn].concealed, tileId);
   if (tile === null) return rejected(state, "missing-tile", "That tile is not in your hand");
+  const order = discardOrder(state);
   state.players[state.turn].discards.push(tile);
+  order.push(tile.id);
 
   const eligible = discardClaimOptions(state, state.turn, tile);
   if (eligible.length === 0) return accepted(advanceAfterUnclaimedDiscard(state, state.turn));
@@ -508,10 +512,17 @@ function copyHandBase(state: HandBase): HandBase {
   return {
     dealer: state.dealer,
     decisionSequence: state.decisionSequence,
+    ...(state.discardOrder === undefined ? {} : { discardOrder: state.discardOrder }),
     handId: state.handId,
     players: state.players,
     wall: state.wall,
   };
+}
+
+function discardOrder(state: HandBase): string[] {
+  return (state.discardOrder ??= state.players.flatMap((player) =>
+    player.discards.map((tile) => tile.id),
+  ));
 }
 
 function discardClaimOptions(
@@ -593,6 +604,9 @@ function claimPriority(choice: Exclude<ClaimChoice, { kind: "pass" }>): number {
 function transferDiscard(state: HandBase, seat: SeatIndex, tileId: string): PhysicalTile {
   const tile = removeTileById(state.players[seat].discards, tileId);
   if (tile === null) throw new Error("Pending discard invariant failed");
+  const order = discardOrder(state);
+  const index = order.indexOf(tileId);
+  if (index !== -1) order.splice(index, 1);
   return tile;
 }
 

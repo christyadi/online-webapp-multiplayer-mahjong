@@ -254,6 +254,19 @@ describe("pure hand state machine", () => {
     assertPhaseSizes(afterPasses);
   });
 
+  it("keeps remaining discards in the order they were played", () => {
+    const state = makeDiscardState({}, 0);
+    const first = state.players[0].concealed[0];
+    if (first === undefined) throw new Error("Expected an opening discard");
+    let next = finishDiscardClaims(accept(transition(state, 0, discardAction(state, first.id))));
+    if (next.phase !== "awaiting-discard") throw new Error("Expected the next discard turn");
+    const second = next.players[next.turn].concealed[0];
+    if (second === undefined) throw new Error("Expected a second discard");
+    next = accept(transition(next, next.turn, discardAction(next, second.id)));
+
+    expect(next.discardOrder).toEqual([first.id, second.id]);
+  });
+
   it("pung and chow claims transfer one pending discard and require a discard without a draw", () => {
     const pungState = makeDiscardState(
       { 0: { concealed: ["white"] }, 2: { concealed: ["white", "white"] } },
@@ -270,6 +283,7 @@ describe("pure hand state machine", () => {
     if (afterPung.phase !== "awaiting-discard") throw new Error("Expected pung discard");
     expect(afterPung.players[2].melds.at(-1)?.kind).toBe("pung");
     expect(afterPung.players[2].melds.at(-1)?.tiles).toHaveLength(3);
+    expect(afterPung.discardOrder).toEqual([]);
     expect(afterPung.players[0].discards.some((tile) => tile.id === white.id)).toBe(false);
     expectRejected(
       transition(afterPung, 2, { decisionId: afterPung.decisionId, kind: "declare-self-win" }),
@@ -589,7 +603,7 @@ describe("pure hand state machine", () => {
     expect(ended.result.winner).toBe(1);
   });
 
-  it("rotates the dealer after every finished hand", () => {
+  it("rotates the dealer counter-clockwise through East, South, West, and North", () => {
     expect([0, 1, 2, 3].map((seat) => rotateDealer(seat as SeatIndex))).toEqual([1, 2, 3, 0]);
   });
 });

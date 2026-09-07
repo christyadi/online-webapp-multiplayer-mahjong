@@ -947,6 +947,7 @@ function Table({
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
   const [closedResultHandId, setClosedResultHandId] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [showTableMenu, setShowTableMenu] = useState(false);
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
   const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
@@ -1077,10 +1078,14 @@ function Table({
     const previous = previousGame.current;
     if (previous.roomRevision !== game.roomRevision || previous.handId !== game.handId) {
       const nextAction = publicActionSince(previous, game);
-      if (nextAction !== null) setLatestPublicAction(nextAction);
+      setLatestPublicAction(nextAction);
       previousGame.current = game;
     }
   }, [game]);
+
+  useEffect(() => {
+    setShowOpponentTiles(false);
+  }, [game.handId]);
 
   if (viewer === undefined)
     return <StatusCard message="Your seat is unavailable." title="Table error" />;
@@ -1137,10 +1142,17 @@ function Table({
             </div>
           </div>
           <div className="table-header-actions">
-            <div aria-atomic="true" aria-live="polite" className="table-activity" role="status">
-              <span>Table activity</span>
-              <strong>{latestPublicAction}</strong>
-            </div>
+            {latestPublicAction === null ? null : (
+              <div
+                aria-atomic="true"
+                aria-label="Table activity"
+                aria-live="polite"
+                className="table-activity"
+                role="status"
+              >
+                <strong>{latestPublicAction}</strong>
+              </div>
+            )}
             <div className="table-status" aria-label="Turn countdown">
               <span>{game.phase === "hand-ended" ? "Hand complete" : "Live hand"}</span>
               {seconds === null ? null : <strong>{seconds}s</strong>}
@@ -1156,17 +1168,16 @@ function Table({
               </button>
             )}
             <button
-              aria-controls="table-rules"
-              aria-expanded={showRules}
-              aria-label="Table rules"
-              className="table-help-trigger"
-              onClick={() => setShowRules(true)}
-              title="How to play"
+              aria-controls="table-menu"
+              aria-expanded={showTableMenu}
+              aria-label="Table menu"
+              className="table-menu-trigger"
+              onClick={() => setShowTableMenu(true)}
               type="button"
             >
-              <span aria-hidden="true">?</span>
+              <span aria-hidden="true">☰</span>
+              <span>Menu</span>
             </button>
-            <ThemeToggle className="table-theme-toggle" onToggle={onToggleTheme} theme={theme} />
           </div>
         </header>
 
@@ -1297,7 +1308,27 @@ function Table({
             rematchSeconds={rematchSeconds}
           />
         )}
-        {showRules ? <RulesDialog onClose={() => setShowRules(false)} /> : null}
+        {showTableMenu ? (
+          <TableMenu
+            connected={realtime?.connected ?? false}
+            onClose={() => setShowTableMenu(false)}
+            onLeave={onLeave}
+            onShowRules={() => {
+              setShowTableMenu(false);
+              setShowRules(true);
+            }}
+            onToggleTheme={onToggleTheme}
+            theme={theme}
+          />
+        ) : null}
+        {showRules ? (
+          <RulesDialog
+            onClose={() => {
+              setShowRules(false);
+              setShowTableMenu(true);
+            }}
+          />
+        ) : null}
         {showOpponentTiles ? (
           <OpponentHandsDialog game={game} onClose={() => setShowOpponentTiles(false)} />
         ) : null}
@@ -1306,12 +1337,6 @@ function Table({
             {error}
           </p>
         )}
-        <div className="table-footer">
-          <p>{realtime?.connected ? "Connected" : "Reconnecting…"}</p>
-          <button className="text-button" onClick={onLeave} type="button">
-            Leave game
-          </button>
-        </div>
       </section>
     </main>
   );
@@ -1357,17 +1382,13 @@ function PlayerPanel({
         </div>
       )}
       {player.melds.length === 0 ? null : (
-        <div className="meld-strip" aria-label={`${player.nickname ?? "Player"} exposed melds`}>
+        <div className="meld-strip" aria-label={`${player.nickname ?? "Player"} melds`}>
           {player.melds.map((meld, index) => (
-            <div className="meld-group" key={`${meld.kind}-${String(index)}`}>
-              <span className="meld-name">
-                {meld.kind === "chow" ? "Chow" : meld.kind === "pung" ? "Pung" : "Kong"}
-              </span>
-              <span className="meld-summary">
-                {meld.tiles === null
-                  ? `${String(meld.tileCount)} concealed tiles`
-                  : meld.tiles.map((tile) => compactTileLabel(tile.type)).join(" · ")}
-              </span>
+            <div
+              aria-label={`${meld.concealed ? "Concealed" : "Exposed"} ${meld.kind}`}
+              className="meld-group"
+              key={`${meld.kind}-${String(index)}`}
+            >
               <div className="meld-tiles">
                 {(meld.tiles ?? []).map((tile) => (
                   <TileArt key={tile.id} tile={tile} />
@@ -1397,14 +1418,6 @@ function BotIndicator() {
   );
 }
 
-function compactTileLabel(type: TileType): string {
-  const details = suitedTileDetails(type);
-  if (details !== null) return `${String(details.rank)} of ${details.suit}`;
-  return type === "east" || type === "south" || type === "west" || type === "north"
-    ? `${type} wind`
-    : `${type} dragon`;
-}
-
 function playerStatus(
   game: GameSnapshot,
   seat: number,
@@ -1421,9 +1434,10 @@ function playerStatus(
 }
 
 function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
-  const discards = game.players.flatMap((player) =>
-    player.discards.map((tile) => ({ player, tile })),
-  );
+  const discards = game.discardPool.map(({ seat, tile }) => ({
+    player: game.players[seat]!,
+    tile,
+  }));
   return (
     <div className="discard-pool" aria-label="All discarded tiles">
       <div className="discard-pool-heading">
@@ -1484,6 +1498,40 @@ function RulesDialog({ onClose }: Readonly<{ onClose: () => void }>) {
           temporarily played by a bot and returns to human control when it reconnects.
         </li>
       </ul>
+    </TableDialog>
+  );
+}
+
+function TableMenu({
+  connected,
+  onClose,
+  onLeave,
+  onShowRules,
+  onToggleTheme,
+  theme,
+}: Readonly<{
+  connected: boolean;
+  onClose: () => void;
+  onLeave: () => void;
+  onShowRules: () => void;
+  onToggleTheme: () => void;
+  theme: Theme;
+}>) {
+  return (
+    <TableDialog id="table-menu" onClose={onClose} title="Table menu">
+      <p className="dialog-intro">Table settings</p>
+      <p className="table-menu-connection" role="status">
+        {connected ? "Connected" : "Reconnecting…"}
+      </p>
+      <div className="table-menu-actions">
+        <ThemeToggle className="table-menu-theme-toggle" onToggle={onToggleTheme} theme={theme} />
+        <button aria-controls="table-rules" onClick={onShowRules} type="button">
+          <span aria-hidden="true">?</span> How to play
+        </button>
+        <button className="table-menu-leave" onClick={onLeave} type="button">
+          Leave game
+        </button>
+      </div>
     </TableDialog>
   );
 }
@@ -1629,16 +1677,10 @@ function TableDialog({
   );
 }
 
-function initialPublicAction(game: GameSnapshot): string {
-  if (game.result?.kind === "win") return `${seatName(game.result.winner)} won the hand.`;
-  if (game.result?.kind === "draw") return "The wall is empty. This hand is a draw.";
+function initialPublicAction(game: GameSnapshot): string | null {
   if (game.pendingDiscard !== null)
     return discardActionLabel(game, game.pendingDiscard.seat, game.pendingDiscard.tile.type);
-  if (game.pendingAddedKong !== null)
-    return `${playerNicknameForSeat(game, game.pendingAddedKong.seat)} proposed an added Kong.`;
-  if (game.activeSeat !== null)
-    return `${playerNicknameForSeat(game, game.activeSeat)} is choosing a discard.`;
-  return "Waiting for the table.";
+  return null;
 }
 
 function publicActionSince(previous: GameSnapshot, game: GameSnapshot): string | null {
@@ -1652,15 +1694,18 @@ function publicActionSince(previous: GameSnapshot, game: GameSnapshot): string |
     if (newDiscard !== undefined) return discardActionLabel(game, player.seat, newDiscard.type);
   }
 
-  if (
-    game.pendingAddedKong !== null &&
-    game.pendingAddedKong.tile.id !== previous.pendingAddedKong?.tile.id
-  ) {
-    return `${playerNicknameForSeat(game, game.pendingAddedKong.seat)} proposed an added Kong.`;
+  for (const player of game.players) {
+    const previousMelds =
+      previous.players.find((candidate) => candidate.seat === player.seat)?.melds ?? [];
+    const changedMeld = player.melds.find(
+      (meld, index) =>
+        previousMelds[index] === undefined ||
+        previousMelds[index].kind !== meld.kind ||
+        previousMelds[index].tileCount !== meld.tileCount,
+    );
+    if (changedMeld !== undefined) return meldActionLabel(game, player.seat, changedMeld.kind);
   }
-  if (previous.result === null && game.result !== null) return initialPublicAction(game);
-  if (game.activeSeat !== null && previous.activeSeat !== game.activeSeat)
-    return `${playerNicknameForSeat(game, game.activeSeat)} is choosing a discard.`;
+
   return null;
 }
 
@@ -1670,6 +1715,11 @@ function discardActionLabel(
   type: Parameters<typeof tileTypeName>[0],
 ): string {
   return `${playerNicknameForSeat(game, seat)} discarded ${tileTypeName(type)}.`;
+}
+
+function meldActionLabel(game: GameSnapshot, seat: number, kind: "chow" | "pung" | "kong"): string {
+  const name = kind === "chow" ? "Chow" : kind === "pung" ? "Pung" : "Kong";
+  return `${playerNicknameForSeat(game, seat)} called ${name}.`;
 }
 
 function playerNicknameForSeat(game: GameSnapshot, seat: number): string {
@@ -2020,11 +2070,11 @@ function seatPosition(seat: number, viewerSeat: number): "north" | "east" | "sou
     case 0:
       return "south";
     case 1:
-      return "west";
+      return "east";
     case 2:
       return "north";
     default:
-      return "east";
+      return "west";
   }
 }
 

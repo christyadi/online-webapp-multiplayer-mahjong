@@ -17,8 +17,6 @@ Visual-design and UX refinement are the active priorities. Public deployment is 
 - [x] 6. Implement deterministic bots, timeouts, disconnect takeover/rejoin, duplicate-tab control, restart behavior, and 100 simulations.
 - [x] 7. Complete the responsive, accessible playable interface, local SVG tile art, help, reconnect, results, and rematches.
 - [x] 8. Verify integrated two-human/two-bot play across desktop engines and mobile Chromium, including reconnect, claims, and rematch (Firefox deferred at the user's direction).
-- [ ] 9. Deferred by user — after the design and plan are complete, manually configure the private GitHub repository and one zero-spend Render Free service; then verify the public page, health, sockets, invite deep links, reconnect, and hand/rematch.
-- [ ] 10. After the user-configured deployment is verified, complete three specialist final reviews and corrected re-review, release commit, and user handoff; leave the branch unmerged.
 
 ## Milestone 7 UI refinement feedback
 
@@ -117,13 +115,10 @@ These player-review improvements were resolved as part of the completed visual r
 
 ## Newly reported gameplay and responsive UI feedback (2026-09-07)
 
-- [ ] Fix Kong visibility during play: exposed Kongs must be rendered as public four-tile melds for every player, while concealed-Kong identities remain face-down to opponents until the hand ends; add regression coverage for both cases and for the final reveal.
-- [ ] Fix the end-of-hand opponent-hand inspection control becoming unresponsive after a rematch starts. Clear stale result-dialog/inspection state on every `handId` transition, keep the control bound to the active result hand, and verify it can be opened and closed again after starting a new hand.
-- [ ] Add a compact responsive top navigation/menu for mobile gameplay. Move settings, light/dark mode, How to play (question-mark action), connection status, and Leave game into the top menu; remove the bottom navigation/status bar and its Leave game action, preserve accessible 44px controls, and verify the table remains usable without page-level scrolling at 390×844 and 844×390.
-
-## Newly reported table activity and turn-order feedback (2026-09-07)
-
-- [ ] Simplify table activity to a public action feed: show only the discarded tile and meaningful player actions (Pung, Chow/Chuw, or Kong). Remove unrelated status chatter and keep the feed accessible without exposing private hand information.
-- [ ] Keep the central discard pond in chronological play order rather than grouping or sorting tiles by player. The newest discard must remain identifiable as the latest action, while older tiles preserve the sequence in which they were discarded.
-- [ ] Remove visible tile-name text from the public Pung, Chow/Chuw, and Kong melds. Show the tile faces only (retain non-visible accessible labels where needed), and verify the compact melds remain identifiable for every player.
-- [ ] Change turn progression to a consistent counter-clockwise seat sequence. Apply the same order to normal draws, discard claims, active-player indicators, timers, and dealer rotation, and add a full-loop regression test for the four seats.
+- [x] Fix Kong visibility during play: exposed Kongs must be rendered as public four-tile melds for every player, while concealed-Kong identities remain face-down to opponents until the hand ends; add regression coverage for both cases and for the final reveal.
+- [x] Fix the end-of-hand opponent-hand inspection control becoming unresponsive after a rematch starts. Clear stale result-dialog/inspection state on every `handId` transition, keep the control bound to the active result hand, and verify it can be opened and closed again after starting a new hand.
+- [x] Add a compact responsive top navigation/menu for mobile gameplay. Move settings, light/dark mode, How to play (question-mark action), connection status, and Leave game into the top menu; remove the bottom navigation/status bar and its Leave game action, preserve accessible 44px controls, and verify the table remains usable without page-level scrolling at 390×844 and 844×390.
+- [x] Simplify table activity to a public action feed: show only the discarded tile and meaningful player actions (Pung, Chow/Chuw, or Kong). Remove unrelated status chatter and keep the feed accessible without exposing private hand information.
+- [x] Keep the central discard pond in chronological play order rather than grouping or sorting tiles by player. The newest discard must remain identifiable as the latest action, while older tiles preserve the sequence in which they were discarded.
+- [x] Remove visible tile-name text from the public Pung, Chow/Chuw, and Kong melds. Show the tile faces only (retain non-visible accessible labels where needed), and verify the compact melds remain identifiable for every player.
+- [x] Change turn progression to a consistent counter-clockwise seat sequence. Apply the same order to normal draws, discard claims, active-player indicators, timers, and dealer rotation, and add a full-loop regression test for the four seats.

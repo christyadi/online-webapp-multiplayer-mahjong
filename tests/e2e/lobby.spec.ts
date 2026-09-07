@@ -120,7 +120,10 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await expect(host.getByText("Playing · choose discard")).toBeVisible();
     await expect(host.getByText("Waiting for discard")).toHaveCount(3);
     await expect(host.locator(".seat-turn-timer")).toHaveCount(1);
-    await expect(host.locator(".table-activity")).toContainText("choosing a discard");
+    await expect(host.locator(".table-activity")).toHaveCount(0);
+    await expect(host.locator(".seat-position-east .player-panel.seat-1")).toBeVisible();
+    await expect(host.locator(".seat-position-north .player-panel.seat-2")).toBeVisible();
+    await expect(host.locator(".seat-position-west .player-panel.seat-3")).toBeVisible();
     await expect(host.locator(".draggable-tile.is-drawn-tile")).toHaveCount(1);
     await expect(host.locator(".player-panel.seat-0")).toHaveClass(/seat-0/);
     await expect(host.locator(".table-center .discard-pool")).toBeVisible();
@@ -141,18 +144,23 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     const activeTheme = await host.locator("html").getAttribute("data-theme");
     if (activeTheme !== "light" && activeTheme !== "dark")
       throw new Error("Theme was not initialized");
+    const tableMenu = host.getByRole("button", { name: "Table menu" });
+    await tableMenu.click();
+    const menuDialog = host.getByRole("dialog", { name: "Table menu" });
+    await expect(menuDialog).toBeVisible();
+    await expect(menuDialog).toContainText("Connected");
     if (activeTheme === "dark") {
-      await host.getByRole("button", { name: "Switch to light mode" }).click();
+      await menuDialog.getByRole("button", { name: "Switch to light mode" }).click();
     }
     await expect(host.locator("html")).toHaveAttribute("data-theme", "light");
     expect(await contrastRatio(host.locator(".player-panel.seat-0"))).toBeGreaterThanOrEqual(4.5);
 
     const nextTheme = "dark";
-    await host.getByRole("button", { name: `Switch to ${nextTheme} mode` }).click();
+    await menuDialog.getByRole("button", { name: `Switch to ${nextTheme} mode` }).click();
     await expect(host.locator("html")).toHaveAttribute("data-theme", nextTheme);
     await expect(host.locator(".table-felt")).toBeVisible();
     await expect(host.locator(".tile-rack .tile-art").first()).toBeVisible();
-    const tableRules = host.getByRole("button", { name: "Table rules" });
+    const tableRules = menuDialog.getByRole("button", { name: "How to play" });
     await tableRules.click();
     await expect(host.getByRole("dialog", { name: "How to play" })).toBeVisible();
     const closeRules = host.getByRole("button", { name: "Close How to play" });
@@ -161,7 +169,11 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await expect(closeRules).toBeFocused();
     await host.keyboard.press("Escape");
     await expect(host.getByRole("dialog", { name: "How to play" })).toHaveCount(0);
-    await expect(tableRules).toBeFocused();
+    await expect(menuDialog).toBeVisible();
+    const closeMenu = menuDialog.getByRole("button", { name: "Close Table menu" });
+    await expect(closeMenu).toBeFocused();
+    await closeMenu.click();
+    await expect(menuDialog).toHaveCount(0);
     await host.reload();
     await expect(host.getByRole("heading", { name: "Mahjong table" })).toBeAttached();
     await expect(host.locator(".seat-position-south .tile-rack .tile-art")).toHaveCount(14);
@@ -256,7 +268,9 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     } else await discard.click();
     await expect(host.locator(".table-felt")).toBeVisible();
     await expect(host.locator(".table-activity")).toContainText("Host discarded");
-    await expect(host.locator(".table-footer").getByText("Connected")).toBeVisible();
+    await expect(host.locator(".table-footer")).toHaveCount(0);
+    await host.getByRole("button", { name: "Table menu" }).click();
+    await expect(host.getByRole("dialog", { name: "Table menu" })).toContainText("Connected");
   } finally {
     await Promise.all(contexts.map(async (context) => context.close()));
   }
@@ -290,6 +304,7 @@ test("leaving an active hand releases the guest for a new room", async ({ page }
   await expect(page.getByRole("heading", { name: "Mahjong table" })).toBeAttached();
 
   page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Table menu" }).click();
   await page.getByRole("button", { name: "Leave game" }).click();
   await expect(page.getByRole("heading", { name: "Mahjong Together" })).toBeVisible();
 

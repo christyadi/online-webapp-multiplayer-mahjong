@@ -120,6 +120,9 @@ const handResultSchema = z.discriminatedUnion("kind", [
 export const gameSnapshotSchema = z.object({
   activeSeat: z.number().int().min(0).max(3).nullable(),
   deadline: z.number().int().nullable(),
+  discardPool: z.array(
+    z.object({ seat: z.number().int().min(0).max(3), tile: physicalTileSchema }),
+  ),
   rematchDeadline: z.number().int().nullable(),
   decisionId: z.string().nullable(),
   dealer: z.number().int().min(0).max(3),

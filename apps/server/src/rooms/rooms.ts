@@ -6,6 +6,7 @@ import {
   type CommandAcknowledgement,
   type GameCommand,
   type GameSnapshot,
+  type PhysicalTile,
   type RoomInvitation,
   type RoomView,
 } from "@mahjong-together/shared";
@@ -870,6 +871,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
   return gameSnapshotSchema.parse({
     activeSeat: hand.phase === "awaiting-discard" ? hand.turn : null,
     deadline: room.deadline,
+    discardPool: orderedDiscards(hand),
     rematchDeadline: hand.phase === "hand-ended" ? room.rematchDeadline : null,
     decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
     dealer: hand.dealer,
@@ -914,6 +916,19 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
     viewerSeat,
     waitingSeats: waitingSeatsFor(hand),
     wallCount: hand.wall.length,
+  });
+}
+
+function orderedDiscards(hand: HandState): { seat: SeatIndex; tile: PhysicalTile }[] {
+  const byId = new Map<string, { seat: SeatIndex; tile: PhysicalTile }>();
+  for (const [seat, player] of hand.players.entries()) {
+    for (const tile of player.discards) byId.set(tile.id, { seat: seat as SeatIndex, tile });
+  }
+  const order =
+    hand.discardOrder ?? hand.players.flatMap((player) => player.discards.map((tile) => tile.id));
+  return order.flatMap((id) => {
+    const discard = byId.get(id);
+    return discard === undefined ? [] : [discard];
   });
 }
 

@@ -359,6 +359,27 @@ describe("queued room gameplay", () => {
     for (const tile of kongTiles) expect(opponentPayload).not.toContain(tile.id);
   });
 
+  it("sends central discards in play order instead of grouping them by seat", () => {
+    const controlled = startHand(uuid(), 0, createTileSet());
+    const eastTile = controlled.players[0].concealed.shift();
+    const southTile = controlled.players[1].concealed.shift();
+    if (eastTile === undefined || southTile === undefined)
+      throw new Error("Expected discard tiles");
+    controlled.players[0].discards.push(eastTile);
+    controlled.players[1].discards.push(southTile);
+    controlled.discardOrder = [southTile.id, eastTile.id];
+    const store = new RoomStore({
+      codeFactory: () => "discardorder",
+      handFactory: () => structuredClone(controlled),
+    });
+    const room = startRoom(store, 2);
+
+    expect(store.getGameSnapshot(guest(0), room.code).discardPool).toEqual([
+      { seat: 1, tile: southTile },
+      { seat: 0, tile: eastTile },
+    ]);
+  });
+
   it("makes every concealed hand available to the results view after the hand ends", () => {
     const initial = startHand(uuid(), 0, createTileSet());
     const ended: HandEndedState = {
