@@ -680,7 +680,7 @@ function Lobby({
 
   const copyInvite = async () => {
     try {
-      await navigator.clipboard.writeText(room.code);
+      await navigator.clipboard.writeText(inviteUrl);
       setCopyStatus("Invite link copied.");
       setManualCopy(false);
     } catch {
@@ -839,7 +839,7 @@ function Table({
   const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [touchReorderSourceId, setTouchReorderSourceId] = useState<string | null>(null);
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
-  const [dismissedResultHandId, setDismissedResultHandId] = useState<string | null>(null);
+  const [showResult, setShowResult] = useState(() => game.result !== null);
   const [showRules, setShowRules] = useState(false);
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
   const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
@@ -849,6 +849,7 @@ function Table({
   const autoPlayTimeoutRef = useRef<number | null>(null);
   const playAgainRef = useRef(onPlayAgain);
   const previousGame = useRef(game);
+  const displayedResultHandId = useRef<string | null>(game.result === null ? null : game.handId);
   const touchTilePress = useRef<{
     activated: boolean;
     pointerId: number;
@@ -925,7 +926,6 @@ function Table({
       ? null
       : Math.max(0, game.rematchDeadline - game.serverTime - (clock - game.serverTime));
   const rematchSeconds = rematchRemaining === null ? null : Math.ceil(rematchRemaining / 1000);
-  const resultVisible = game.result !== null && dismissedResultHandId !== game.handId;
 
   useEffect(() => {
     playAgainRef.current = onPlayAgain;
@@ -940,8 +940,6 @@ function Table({
       window.clearTimeout(autoPlayTimeoutRef.current);
       autoPlayTimeoutRef.current = null;
     }
-    setShowOpponentTiles(false);
-    setDismissedResultHandId(null);
     playAgainRef.current();
   }, []);
 
@@ -969,6 +967,18 @@ function Table({
     const timer = window.setInterval(() => setClock(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, [game.deadline, game.rematchDeadline]);
+
+  useEffect(() => {
+    if (game.result === null) {
+      displayedResultHandId.current = null;
+      setShowResult(false);
+      return;
+    }
+    if (displayedResultHandId.current !== game.handId) {
+      displayedResultHandId.current = game.handId;
+      setShowResult(true);
+    }
+  }, [game.handId, game.result]);
 
   useEffect(() => {
     const previous = previousGame.current;
@@ -1040,11 +1050,11 @@ function Table({
               <span>{game.phase === "hand-ended" ? "Hand complete" : "Live hand"}</span>
               {seconds === null ? null : <strong>{seconds}s</strong>}
             </div>
-            {game.result === null || resultVisible ? null : (
+            {game.result === null || showResult ? null : (
               <button
                 aria-controls="hand-result"
                 className="table-result-trigger"
-                onClick={() => setDismissedResultHandId(null)}
+                onClick={() => setShowResult(true)}
                 type="button"
               >
                 View result
@@ -1178,13 +1188,13 @@ function Table({
           </div>
         </div>
 
-        {!resultVisible ? null : (
+        {game.result === null || !showResult ? null : (
           <ResultDialog
             autoPlayAgain={autoPlayAgain}
             autoPlaySeconds={autoPlaySeconds}
             canPlayAgain={canPlayAgain}
             game={game}
-            onClose={() => setDismissedResultHandId(game.handId)}
+            onClose={() => setShowResult(false)}
             onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
             onShowOpponentTiles={() => setShowOpponentTiles(true)}
             onPlayAgain={startNextHand}
