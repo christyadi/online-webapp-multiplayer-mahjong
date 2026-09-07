@@ -34,7 +34,7 @@ Visual-design and UX refinement are the active priorities. Public deployment is 
 - [x] Add a results-view option to reveal the other players' concealed hands only after hand completion.
 - [x] Keep the viewer's hand in one lower rack; the results toggle reveals opponents only, never a duplicate viewer hand.
 - [x] Add a deterministic Sort hand control for the viewer's concealed tiles.
-- [x] Add a visible drag-to-reorder hint and tile grip affordance beside the hand controls.
+- [x] Keep a concise drag-to-reorder hint beside the hand controls without adding a grip control to every tile.
 - [x] Keep the felt compact within the full-screen shell while giving opponent cards more room for inspection.
 - [x] Sort revealed opponent concealed tiles by Mahjong type and stable physical-tile ID at hand end.
 - [x] Make leaving an active hand release the guest session so a new room can be created immediately.
@@ -67,11 +67,21 @@ The attached HTML concepts and design-system note are recorded in [DESIGN.md](./
 - [x] Preserve exposed melds in a compact, horizontally scrollable strip at both phone orientations, with readable text summaries of the tile names; never hide public Chow, Pung, or Kong information to save space.
 - [x] Make rules and end-hand inspection true keyboard dialogs: mount above the application surface, make background controls inert, contain Tab focus, support Escape, and restore the owning control on close.
 - [x] Keep every interactive control at least 44×44 CSS pixels at touch breakpoints. Compress tile artwork and permit only intentional internal scrolling rather than shrinking targets.
-- [x] Support hand reordering with mouse drag, a dedicated non-scrolling touch drag grip, and keyboard selection plus adjacent move controls; retain a concise visible affordance.
+- [x] Support hand reordering with mouse drag and a touch hold-then-tap placement pattern. Keep Sort hand and a concise visible affordance, but remove per-tile grip chrome and adjacent left/right movement buttons while preserving normal phone rack panning.
 
-## Visual refinement review gate (2026-09-07)
+## Original visual refinement review gate (2026-09-07)
 
-- [x] Independent corrected re-review found no unresolved critical, high, or medium issue. It explicitly checked the phone touch drag grip, readable compact meld summaries, 44px controls including the fixed theme toggle, dialog isolation, dark contrast, and header reachability.
+- [x] The original independent corrected re-review found no unresolved critical, high, or medium issue in the prior grip-based ordering implementation. The later landing-and-table feedback superseded that ordering mechanism; its current acceptance criteria are recorded below.
+
+## Latest landing and table feedback (2026-09-07)
+
+- [x] Give the dark landing card its own high-contrast material surface rather than inheriting a light ivory treatment.
+- [x] Give light-mode player cards distinct seat-tinted fills with dark readable text and metadata.
+- [x] Replace reconnect/controller prose in player cards with an accessible bot icon only when a bot controls that seat.
+- [x] Remove left/right tile movement controls and the per-tile three-dot grip. Keep Sort hand, desktop mouse dragging, touch hold-then-tap placement, and a concise hint.
+- [x] Add a landing-page **Join a lobby** section that validates a 12-character invite code and opens the existing private invitation flow.
+- [x] Add browser checks for dark landing and light player-card contrast, private lobby-code entry, bot icons, removed ordering chrome, and touch hold-then-tap ordering.
+- [x] Resolve the corrected review’s phone-scroll finding. The re-review found no unresolved critical, high, or medium issue in the landing, player-card, or revised ordering changes.
 
 ## Future UX refinement backlog (captured 2026-09-06)
 

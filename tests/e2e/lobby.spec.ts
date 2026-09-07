@@ -1,4 +1,11 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 
 test("isolated guests keep distinct seats through joins and refresh", async ({
   browser,
@@ -73,7 +80,8 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
         () => (document.scrollingElement?.scrollHeight ?? 0) <= window.innerHeight + 1,
       ),
     ).toBe(true);
-    await expect(host.locator(".seat-detail", { hasText: "Bot" })).toHaveCount(2);
+    await expect(host.getByRole("img", { name: "Bot player" })).toHaveCount(2);
+    await expect(host.locator(".player-panel .seat-detail")).toHaveCount(0);
     await expect(host.locator(".table-seat")).toHaveCount(4);
     await expect(host.locator(".seat-position-south .tile-rack")).toBeVisible();
     await expect(host.locator(".seat-position-east .tile-rack")).toHaveCount(0);
@@ -102,7 +110,13 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     const activeTheme = await host.locator("html").getAttribute("data-theme");
     if (activeTheme !== "light" && activeTheme !== "dark")
       throw new Error("Theme was not initialized");
-    const nextTheme = activeTheme === "dark" ? "light" : "dark";
+    if (activeTheme === "dark") {
+      await host.getByRole("button", { name: "Switch to light mode" }).click();
+    }
+    await expect(host.locator("html")).toHaveAttribute("data-theme", "light");
+    expect(await contrastRatio(host.locator(".player-panel.seat-0"))).toBeGreaterThanOrEqual(4.5);
+
+    const nextTheme = "dark";
     await host.getByRole("button", { name: `Switch to ${nextTheme} mode` }).click();
     await expect(host.locator("html")).toHaveAttribute("data-theme", nextTheme);
     await expect(host.locator(".table-felt")).toBeVisible();
@@ -126,7 +140,9 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
       /value/,
     );
     await expect(host.getByRole("button", { name: "Sort hand" })).toBeVisible();
-    await expect(host.getByText("Drag tiles or select one to move it")).toBeVisible();
+    await expect(host.getByText("Drag a tile, or hold one on touch to rearrange")).toBeVisible();
+    await expect(host.locator(".tile-drag-grip")).toHaveCount(0);
+    await expect(host.getByRole("button", { name: /Move selected tile/ })).toHaveCount(0);
     const rackTiles = host.locator(".tile-rack .draggable-tile");
     const beforeOrder = await rackTiles.evaluateAll((elements) =>
       elements.map((element) => element.getAttribute("data-tile-id")),
@@ -139,27 +155,53 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
       expect(afterOrder).not.toEqual(beforeOrder);
     }
     if (testInfo.project.name.startsWith("phone")) {
+      const rack = host.locator(".tile-rack");
+      await rack.evaluate((element) => {
+        element.scrollLeft = 0;
+      });
+      const lastTile = rackTiles.last();
+      expect(
+        await lastTile.evaluate((tile) => {
+          const rackElement = tile.parentElement;
+          if (rackElement === null) throw new Error("Tile rack is unavailable");
+          return tile.getBoundingClientRect().right > rackElement.getBoundingClientRect().right;
+        }),
+      ).toBe(true);
+      await rack.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth;
+      });
+      await expect.poll(() => rack.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      const lastTileButton = lastTile.locator(".tile-button");
+      await expect(lastTileButton).toBeInViewport();
+      await lastTileButton.click();
+      await expect(lastTileButton).toHaveAttribute("aria-pressed", "true");
+      await lastTileButton.click();
+      await expect(lastTileButton).toHaveAttribute("aria-pressed", "false");
+
+      await rack.evaluate((element) => {
+        element.scrollLeft = 0;
+      });
       const touchSource = rackTiles.first();
       const touchTarget = rackTiles.nth(2);
       const sourceId = await touchSource.getAttribute("data-tile-id");
       await touchSource.scrollIntoViewIfNeeded();
-      const targetBox = await touchTarget.boundingBox();
-      const grip = touchSource.locator(".tile-drag-grip");
-      const gripBox = await grip.boundingBox();
-      if (gripBox === null || targetBox === null)
-        throw new Error("Touch tile positions unavailable");
-      await grip.dispatchEvent("pointerdown", {
-        clientX: gripBox.x + gripBox.width / 2,
-        clientY: gripBox.y + gripBox.height / 2,
+      const sourceBox = await touchSource.boundingBox();
+      if (sourceBox === null) throw new Error("Touch tile positions unavailable");
+      await touchSource.dispatchEvent("pointerdown", {
+        clientX: sourceBox.x + sourceBox.width / 2,
+        clientY: sourceBox.y + sourceBox.height / 2,
         pointerId: 1,
         pointerType: "touch",
       });
-      await grip.dispatchEvent("pointerup", {
-        clientX: targetBox.x + targetBox.width / 2,
-        clientY: targetBox.y + targetBox.height / 2,
+      await host.waitForTimeout(500);
+      await expect(touchSource).toHaveClass(/is-touch-reorder-source/);
+      await touchSource.dispatchEvent("pointerup", {
+        clientX: sourceBox.x + sourceBox.width / 2,
+        clientY: sourceBox.y + sourceBox.height / 2,
         pointerId: 1,
         pointerType: "touch",
       });
+      await touchTarget.locator(".tile-button").click();
       await expect(rackTiles.nth(1)).toHaveAttribute("data-tile-id", sourceId ?? "");
     }
     const discard = host.getByRole("button", { name: "Discard selected" });
@@ -171,10 +213,6 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
     await host.keyboard.press("Enter");
     await expect(discard).toBeEnabled();
     await expect(firstTile).toHaveAttribute("aria-pressed", "true");
-    const selectedTileId = await firstTile.locator("xpath=..").getAttribute("data-tile-id");
-    await host.getByRole("button", { name: "Move selected tile right" }).click();
-    await expect(rackTiles.nth(1)).toHaveAttribute("data-tile-id", selectedTileId ?? "");
-    await expect(host.getByRole("button", { name: "Move selected tile left" })).toBeEnabled();
     await host.locator(".tile-rack .tile-button[aria-pressed='true']").focus();
     await host.keyboard.press("Enter");
     await expect(discard).toBeDisabled();
@@ -321,4 +359,28 @@ async function createRoom(page: Page, nickname: string): Promise<void> {
   await page.getByLabel("Nickname").fill(nickname);
   await page.getByRole("button", { name: "Create a private room" }).click();
   await expect(page.getByRole("heading", { name: "Your private table" })).toBeVisible();
+}
+
+async function contrastRatio(locator: Locator): Promise<number> {
+  return locator.evaluate((element) => {
+    const parseColor = (color: string) => {
+      const channels = color
+        .match(/\d+(?:\.\d+)?/g)
+        ?.slice(0, 3)
+        .map(Number);
+      if (channels?.length !== 3) throw new Error(`Unsupported color ${color}`);
+      return channels;
+    };
+    const luminance = (channels: number[]) => {
+      const [red, green, blue] = channels.map((channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+    };
+    const style = window.getComputedStyle(element);
+    const foreground = luminance(parseColor(style.color));
+    const background = luminance(parseColor(style.backgroundColor));
+    return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+  });
 }

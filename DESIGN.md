@@ -10,7 +10,9 @@ This document adapts the supplied `mahjong-game-page.html`, `mahjong-landing-pag
 - The gameplay HUD replaces the previous generic title with room/seat context, dealer marker, accessible question-mark rules dialog, current action, and active-seat countdown. End-hand opponent tiles open in a dialog rather than reflowing the table.
 - A restrained six-piece winner treatment stays inside the result banner. All non-essential animations are opt-in through `prefers-reduced-motion: no-preference`.
 - Public exposed melds remain visible in compact, horizontally scrollable strips at phone portrait and landscape sizes, pairing their physical tiles with readable names; responsive compaction never removes game information.
-- Rules and end-hand dialogs are portaled above the app, inert the background, trap Tab focus, close with Escape, and restore their owning control. Local tiles support mouse drag, a dedicated non-scrolling touch drag grip, and a keyboard select-and-move pattern.
+- Rules and end-hand dialogs are portaled above the app, inert the background, trap Tab focus, close with Escape, and restore their owning control. Local tiles support mouse drag; on touch, holding a tile then tapping its destination avoids taking over ordinary horizontal rack panning. Sort hand is the compact non-drag arrangement action; individual grips and left/right movement buttons are intentionally absent.
+- The landing card owns a deep, readable dark-mode surface rather than retaining a light ivory gradient. Its first viewport offers distinct **Create a private room** and **Join a lobby** flows without turning either into a nested card.
+- Light-mode player cards use four seat-tinted paper surfaces with explicit dark text/muted-text values. Controller prose is removed from the card; a compact, labeled robot icon appears only for bot-controlled seats.
 
 ## Purpose and tone
 

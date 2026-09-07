@@ -291,8 +291,19 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 ## Final visual review gate (2026-09-07)
 
-- A second independent, read-only corrected re-review found no remaining critical, high, or medium issue. It verified the dedicated `touch-action: none` touch grip preserves horizontal rack scrolling, the phone fixtures perform a touch-pointer reorder, meld summaries provide readable tile names, and the 44px check includes the fixed theme toggle and tile buttons.
+- A second independent, read-only corrected re-review found no remaining critical, high, or medium issue in the original grip-based ordering implementation. It verified its dedicated `touch-action: none` touch grip, the phone fixtures' touch-pointer reorder, meld summaries, and the 44px controls. This historical checkpoint was superseded by the later hold-then-tap ordering refinement below.
 - The complete visual/design checkpoint is committed and pushed as `f617d1d` on `codex/mahjong-together`. The worktree was clean after the push.
+
+## Latest landing and player-card feedback (2026-09-07)
+
+- Replaced the inherited light landing-card fill with explicit dark-mode component colors, so its text, labels, and inputs retain a high-contrast surface in dark mode.
+- Added a first-viewport **Join a lobby** section. It accepts a case-insensitive 12-character private invite code, validates it locally, and routes into the existing private invitation/nickname flow without creating public matchmaking.
+- Recolored the four light-mode player cards as readable seat-tinted paper surfaces with explicit dark foreground and metadata colors. The browser regression calculates and requires a WCAG AA 4.5:1-or-greater text contrast ratio for a light player card and the dark landing card.
+- Removed reconnect/controller prose from table player cards. A compact robot icon with an accessible `Bot player` name now appears only while a bot controls that seat.
+- Removed the left/right ordering buttons and the three-dot tile grip. Desktop drag remains; on touch, hold a tile and tap the tile that should follow it. This leaves ordinary horizontal swipes available for rack scrolling, Sort hand remains, and a hold does not become an accidental selection.
+- Updated the browser flow to assert the new lobby entry, touch hold-then-tap ordering, offscreen-tile scrolling and selection, absence of the removed ordering controls, bot icons, and both contrast checks. Verification: scoped Prettier, strict typecheck, lint, 89 Vitest tests, production build through the Playwright web server, 9 desktop Chromium flows, and 18 phone Chromium flows (390×844 and 844×390) passed. Firefox remains deferred at the user's direction.
+- The first read-only review confirmed the visual, bot-icon, and private-lobby work, but found a high mobile defect: `touch-action: none` on every tile blocked the rack’s required horizontal panning. The correction restores `pan-x`, uses the hold-then-tap interaction above, and adds the offscreen-tile phone regression. The targeted portrait/landscape table flow, complete phone suite, tablet Chromium suite (9), and WebKit suite (9) all passed after correction.
+- The required corrected re-review found no remaining critical, high, or medium issue. It verified the pan/hold/tap arbitration, source-click suppression, offscreen-tile access, mouse drag, keyboard selection/discard, Sort hand, contrast, bot semantics, removed ordering chrome, and private lobby routing.
 
 ## Next exact step
 

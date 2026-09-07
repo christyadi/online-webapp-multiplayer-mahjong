@@ -352,38 +352,52 @@ function App() {
         <div aria-hidden="true" className="home-hero-tile">
           <TileArt tile={HOME_TILE} />
         </div>
-        <p className="eyebrow">Private games for friends</p>
-        <h1 id="page-title">Mahjong Together</h1>
-        <p>Simple Chinese house rules for one to four people. Empty seats are filled by bots.</p>
-        <NicknameForm
-          buttonLabel="Create a private room"
-          disabled={pending}
-          error={error}
-          onSubmit={async (nickname) => {
-            roomRequests.current.invalidate();
-            setPending(true);
-            setError(null);
-            try {
-              const created = await requestJson(
-                "/api/rooms",
-                lobbyMutationAcknowledgementSchema,
-                controllerId,
-                {
-                  body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
-                  headers: { "content-type": "application/json" },
-                  method: "POST",
-                },
-              );
-              navigate(`/room/${created.roomCode}`);
-              await refreshRoom();
-            } catch (caught) {
-              setError(errorMessage(caught));
-            } finally {
-              setPending(false);
-            }
-          }}
-        />
-        <p className="house-rules-note">No accounts, scoring, money, or matchmaking.</p>
+        <div className="home-content">
+          <p className="eyebrow">Private games for friends</p>
+          <h1 id="page-title">Mahjong Together</h1>
+          <p>Simple Chinese house rules for one to four people. Empty seats are filled by bots.</p>
+          <div className="home-lobby-options">
+            <section className="home-lobby-action" aria-labelledby="create-room-title">
+              <h2 id="create-room-title">Create a private room</h2>
+              <p>Start a table and send the invite code to friends.</p>
+              <NicknameForm
+                buttonLabel="Create a private room"
+                disabled={pending}
+                error={error}
+                fieldId="create-room-nickname"
+                onSubmit={async (nickname) => {
+                  roomRequests.current.invalidate();
+                  setPending(true);
+                  setError(null);
+                  try {
+                    const created = await requestJson(
+                      "/api/rooms",
+                      lobbyMutationAcknowledgementSchema,
+                      controllerId,
+                      {
+                        body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
+                        headers: { "content-type": "application/json" },
+                        method: "POST",
+                      },
+                    );
+                    navigate(`/room/${created.roomCode}`);
+                    await refreshRoom();
+                  } catch (caught) {
+                    setError(errorMessage(caught));
+                  } finally {
+                    setPending(false);
+                  }
+                }}
+              />
+            </section>
+            <section className="home-lobby-action" aria-labelledby="join-lobby-title">
+              <h2 id="join-lobby-title">Join a lobby</h2>
+              <p>Enter the 12-character code from a friend’s invitation.</p>
+              <LobbyCodeForm onJoin={(code) => navigate(`/room/${code}`)} />
+            </section>
+          </div>
+          <p className="house-rules-note">No accounts, scoring, money, or matchmaking.</p>
+        </div>
       </section>
     </main>
   );
@@ -425,6 +439,7 @@ function JoinRoom({
               buttonLabel="Join room"
               disabled={pending}
               error={error}
+              fieldId="join-room-nickname"
               onSubmit={async (nickname) => {
                 onMutationStart();
                 setPending(true);
@@ -464,10 +479,11 @@ type NicknameFormProperties = Readonly<{
   buttonLabel: string;
   disabled: boolean;
   error: string | null;
+  fieldId: string;
   onSubmit: (nickname: string) => Promise<void>;
 }>;
 
-function NicknameForm({ buttonLabel, disabled, error, onSubmit }: NicknameFormProperties) {
+function NicknameForm({ buttonLabel, disabled, error, fieldId, onSubmit }: NicknameFormProperties) {
   const [nickname, setNickname] = useState("");
   const submit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -475,11 +491,11 @@ function NicknameForm({ buttonLabel, disabled, error, onSubmit }: NicknameFormPr
   };
   return (
     <form className="nickname-form" onSubmit={submit}>
-      <label htmlFor="nickname">Nickname</label>
+      <label htmlFor={fieldId}>Nickname</label>
       <input
         autoComplete="nickname"
         disabled={disabled}
-        id="nickname"
+        id={fieldId}
         maxLength={20}
         onChange={(event) => setNickname(event.target.value)}
         required
@@ -488,6 +504,42 @@ function NicknameForm({ buttonLabel, disabled, error, onSubmit }: NicknameFormPr
       <button disabled={disabled} type="submit">
         {disabled ? "Please wait…" : buttonLabel}
       </button>
+      {error === null ? null : (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function LobbyCodeForm({ onJoin }: Readonly<{ onJoin: (code: string) => void }>) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const submit = (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedCode = code.trim().toLowerCase();
+    if (!roomCodeSchema.safeParse(normalizedCode).success) {
+      setError("Enter the 12-character lobby code from your invitation.");
+      return;
+    }
+    setError(null);
+    onJoin(normalizedCode);
+  };
+  return (
+    <form className="lobby-code-form" onSubmit={submit}>
+      <label htmlFor="lobby-code">Lobby code</label>
+      <input
+        autoCapitalize="none"
+        autoComplete="off"
+        id="lobby-code"
+        maxLength={12}
+        onChange={(event) => setCode(event.target.value)}
+        required
+        spellCheck={false}
+        value={code}
+      />
+      <button type="submit">Join lobby</button>
       {error === null ? null : (
         <p className="error" role="alert">
           {error}
@@ -751,6 +803,7 @@ function Table({
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
+  const [touchReorderSourceId, setTouchReorderSourceId] = useState<string | null>(null);
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
@@ -761,12 +814,15 @@ function Table({
   const autoPlayTimeoutRef = useRef<number | null>(null);
   const playAgainRef = useRef(onPlayAgain);
   const previousGame = useRef(game);
-  const touchTileDrag = useRef<Readonly<{
+  const touchTilePress = useRef<{
+    activated: boolean;
     pointerId: number;
     sourceId: string;
     x: number;
     y: number;
-  }> | null>(null);
+  } | null>(null);
+  const touchReorderTimer = useRef<number | null>(null);
+  const suppressedTouchClick = useRef<string | null>(null);
   const viewer = game.players.find((player) => player.seat === game.viewerSeat);
   const legal = game.legalActions;
   const commandPending = pendingDecisionId === game.decisionId;
@@ -785,23 +841,22 @@ function Table({
       moveTile(current.length === 0 ? serverTileIds : current, sourceId, targetId, serverTileIds),
     );
   };
-  const moveSelectedTile = (direction: -1 | 1) => {
-    if (selectedTileId === null) return;
-    setTileOrder((current) => {
-      const order = [
-        ...current.filter((id) => serverTileIds.includes(id)),
-        ...serverTileIds.filter((id) => !current.includes(id)),
-      ];
-      const currentIndex = order.indexOf(selectedTileId);
-      const nextIndex = currentIndex + direction;
-      if (currentIndex === -1 || nextIndex < 0 || nextIndex >= order.length) return order;
-      const [tile] = order.splice(currentIndex, 1);
-      if (tile === undefined) return order;
-      order.splice(nextIndex, 0, tile);
-      return order;
-    });
+  const clearTouchReorderTimer = () => {
+    if (touchReorderTimer.current === null) return;
+    window.clearTimeout(touchReorderTimer.current);
+    touchReorderTimer.current = null;
   };
   const selectTile = (tileId: string) => {
+    if (suppressedTouchClick.current === tileId) {
+      suppressedTouchClick.current = null;
+      return;
+    }
+    if (touchReorderSourceId !== null) {
+      if (touchReorderSourceId !== tileId) reorderTile(touchReorderSourceId, tileId);
+      setTouchReorderSourceId(null);
+      setSelectedTileId(null);
+      return;
+    }
     setSelectedTileId((selected) => (selected === tileId ? null : tileId));
   };
   const sortHand = () => {
@@ -814,7 +869,17 @@ function Table({
         .map((tile) => tile.id),
     );
     setSelectedTileId(null);
+    setTouchReorderSourceId(null);
   };
+
+  useEffect(
+    () => () => {
+      if (touchReorderTimer.current !== null) {
+        window.clearTimeout(touchReorderTimer.current);
+      }
+    },
+    [],
+  );
   const deadlineRemaining =
     game.deadline === null
       ? null
@@ -959,36 +1024,17 @@ function Table({
                     <button className="secondary sort-button" onClick={sortHand} type="button">
                       Sort hand
                     </button>
-                    <button
-                      aria-label="Move selected tile left"
-                      className="secondary reorder-button"
-                      disabled={
-                        selectedTileId === null || orderedTileIds.indexOf(selectedTileId) <= 0
-                      }
-                      onClick={() => moveSelectedTile(-1)}
-                      type="button"
-                    >
-                      Move left
-                    </button>
-                    <button
-                      aria-label="Move selected tile right"
-                      className="secondary reorder-button"
-                      disabled={
-                        selectedTileId === null ||
-                        orderedTileIds.indexOf(selectedTileId) === orderedTileIds.length - 1
-                      }
-                      onClick={() => moveSelectedTile(1)}
-                      type="button"
-                    >
-                      Move right
-                    </button>
-                    <span className="drag-hint">Drag tiles or select one to move it</span>
+                    <span className="drag-hint" role="status">
+                      {touchReorderSourceId === null
+                        ? "Drag a tile, or hold one on touch to rearrange"
+                        : "Tap the tile that should follow the held tile"}
+                    </span>
                   </div>
                   <div className="tile-rack" aria-label="Your concealed tiles">
                     {orderedTiles.map((tile) => (
                       <div
                         aria-label="Drag tile to reorder"
-                        className={`draggable-tile${game.drawnTileId === tile.id ? " is-drawn-tile" : ""}`}
+                        className={`draggable-tile${game.drawnTileId === tile.id ? " is-drawn-tile" : ""}${touchReorderSourceId === tile.id ? " is-touch-reorder-source" : ""}`}
                         data-tile-id={tile.id}
                         draggable
                         key={tile.id}
@@ -1002,40 +1048,49 @@ function Table({
                           const sourceId = event.dataTransfer.getData("text/plain");
                           if (sourceId !== "") reorderTile(sourceId, tile.id);
                         }}
+                        onPointerCancel={() => {
+                          clearTouchReorderTimer();
+                          touchTilePress.current = null;
+                        }}
+                        onPointerDown={(event) => {
+                          if (event.pointerType === "mouse") return;
+                          clearTouchReorderTimer();
+                          const press = {
+                            activated: false,
+                            pointerId: event.pointerId,
+                            sourceId: tile.id,
+                            x: event.clientX,
+                            y: event.clientY,
+                          };
+                          touchTilePress.current = press;
+                          touchReorderTimer.current = window.setTimeout(() => {
+                            if (touchTilePress.current !== press) return;
+                            press.activated = true;
+                            touchReorderTimer.current = null;
+                            setSelectedTileId(null);
+                            setTouchReorderSourceId(tile.id);
+                          }, 450);
+                        }}
+                        onPointerMove={(event) => {
+                          const press = touchTilePress.current;
+                          if (press?.pointerId !== event.pointerId || press.activated) return;
+                          if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < 12)
+                            return;
+                          clearTouchReorderTimer();
+                          touchTilePress.current = null;
+                        }}
+                        onPointerUp={(event) => {
+                          const press = touchTilePress.current;
+                          clearTouchReorderTimer();
+                          touchTilePress.current = null;
+                          if (press?.pointerId !== event.pointerId || !press.activated) return;
+                          suppressedTouchClick.current = press.sourceId;
+                          window.setTimeout(() => {
+                            if (suppressedTouchClick.current === press.sourceId)
+                              suppressedTouchClick.current = null;
+                          }, 0);
+                        }}
                       >
-                        <span
-                          aria-hidden="true"
-                          className="tile-drag-grip"
-                          onPointerCancel={() => {
-                            touchTileDrag.current = null;
-                          }}
-                          onPointerDown={(event) => {
-                            if (event.pointerType === "mouse") return;
-                            try {
-                              event.currentTarget.setPointerCapture(event.pointerId);
-                            } catch {
-                              // Synthetic touch events may not have an active pointer to capture.
-                            }
-                            touchTileDrag.current = {
-                              pointerId: event.pointerId,
-                              sourceId: tile.id,
-                              x: event.clientX,
-                              y: event.clientY,
-                            };
-                          }}
-                          onPointerUp={(event) => {
-                            const drag = touchTileDrag.current;
-                            touchTileDrag.current = null;
-                            if (drag?.pointerId !== event.pointerId) return;
-                            if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12)
-                              return;
-                            const target = document
-                              .elementFromPoint(event.clientX, event.clientY)
-                              ?.closest<HTMLElement>("[data-tile-id]")?.dataset.tileId;
-                            if (target === undefined || target === drag.sourceId) return;
-                            reorderTile(drag.sourceId, target);
-                          }}
-                        />
                         <TileArt
                           onClick={() => selectTile(tile.id)}
                           selected={selectedTileId === tile.id}
@@ -1120,15 +1175,12 @@ function PlayerPanel({
     >
       <div className="player-heading">
         <strong>{player.nickname ?? `Bot ${seatName(player.seat)}`}</strong>
-        <span>
+        <span className="seat-heading-meta">
           {seatName(player.seat)}
           {player.seat === game.dealer ? " · Dealer" : ""}
+          {player.controller === "bot" ? <BotIndicator /> : null}
         </span>
       </div>
-      <small className="seat-detail">
-        {player.connected ? "Connected" : "Reconnecting"} ·{" "}
-        {player.controller === "bot" ? "Bot control" : "Human control"}
-      </small>
       <span className={`turn-indicator turn-${status.kind}`}>{status.label}</span>
       {status.kind === "active" && seconds !== null ? (
         <span aria-label={`${String(seconds)} seconds remaining`} className="seat-turn-timer">
@@ -1172,6 +1224,17 @@ function PlayerPanel({
         </div>
       )}
     </article>
+  );
+}
+
+function BotIndicator() {
+  return (
+    <span aria-label="Bot player" className="bot-indicator" role="img">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <rect height="13" rx="3" width="16" x="4" y="7" />
+        <path d="M12 3v4M9 12h0M15 12h0M9 16h6" />
+      </svg>
+    </span>
   );
 }
 
