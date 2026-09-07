@@ -650,7 +650,7 @@ function nextSeat(seat: SeatIndex): SeatIndex {
   return ((seat + 1) % 4) as SeatIndex;
 }
 
-function otherSeats(seat: SeatIndex): SeatIndex[] {
+export function otherSeats(seat: SeatIndex): SeatIndex[] {
   return [nextSeat(seat), nextSeat(nextSeat(seat)), nextSeat(nextSeat(nextSeat(seat)))];
 }
 

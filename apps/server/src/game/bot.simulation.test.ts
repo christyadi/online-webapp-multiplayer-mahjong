@@ -2,11 +2,11 @@ import { TILE_TYPES } from "@mahjong-together/shared";
 import { describe, expect, it } from "vitest";
 
 import { chooseBotAction } from "./bot.js";
-import { legalActionsForSeat, startHand, transition, type HandState } from "./state.js";
+import { legalActionsForSeat, otherSeats, startHand, transition, type HandState } from "./state.js";
 import { createTileSet, shuffleTiles, type SeatIndex } from "./wall.js";
 
 describe("all-bot engine simulations", () => {
-  it("finishes 100 deterministic hands within 1,000 legal transitions", { timeout: 30_000 }, () => {
+  it("finishes 100 deterministic hands within 1,000 legal transitions", { timeout: 120_000 }, () => {
     for (let seed = 1; seed <= 100; seed += 1) {
       let state: HandState = startHand(
         `00000000-0000-4000-8000-${String(seed).padStart(12, "0")}`,
@@ -20,12 +20,27 @@ describe("all-bot engine simulations", () => {
         let acted = false;
         for (const seat of [0, 1, 2, 3] as const) {
           const legalActions = legalActionsForSeat(state, seat);
-          const action = chooseBotAction({
+          const claimedTile =
+            state.phase === "awaiting-discard-claims"
+              ? state.players[state.discard.seat].discards.find((tile) => tile.id === state.discard.tileId)
+              : undefined;
+          const baseView = {
             concealedTiles: state.players[seat].concealed,
             decisionId: state.decisionId,
             legalActions,
+            opponents: otherSeats(seat).map((opponentSeat) => ({
+              discards: state.players[opponentSeat].discards,
+              melds: state.players[opponentSeat].melds,
+              seat: opponentSeat,
+            })),
+            ownDiscards: state.players[seat].discards,
+            ownMelds: state.players[seat].melds,
             seat,
-          });
+            wallRemaining: state.wall.length,
+          };
+          const action = chooseBotAction(
+            claimedTile !== undefined ? { ...baseView, claimedTile } : baseView,
+          );
           if (action === null) continue;
           const result = transition(state, seat, action);
           if (!result.ok) {

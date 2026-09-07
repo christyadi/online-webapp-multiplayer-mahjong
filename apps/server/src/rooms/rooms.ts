@@ -12,6 +12,7 @@ import {
 import { chooseBotAction } from "../game/bot.js";
 import {
   legalActionsForSeat,
+  otherSeats,
   rotateDealer,
   startHand,
   transition,
@@ -622,12 +623,29 @@ export class RoomStore {
   }
 
   botAction(hand: HandState, seat: SeatIndex): HandAction | null {
-    return chooseBotAction({
+    const claimedTile =
+      hand.phase === "awaiting-discard-claims"
+        ? hand.players[hand.discard.seat].discards.find((tile) => tile.id === hand.discard.tileId)
+        : undefined;
+
+    const baseView = {
       concealedTiles: hand.players[seat].concealed,
       decisionId: hand.phase === "hand-ended" ? "" : hand.decisionId,
       legalActions: legalActionsForSeat(hand, seat),
+      opponents: otherSeats(seat).map((opponentSeat) => ({
+        discards: hand.players[opponentSeat].discards,
+        melds: hand.players[opponentSeat].melds,
+        seat: opponentSeat,
+      })),
+      ownDiscards: hand.players[seat].discards,
+      ownMelds: hand.players[seat].melds,
       seat,
-    });
+      wallRemaining: hand.wall.length,
+    };
+
+    return chooseBotAction(
+      claimedTile !== undefined ? { ...baseView, claimedTile } : baseView,
+    );
   }
 
   isBotControlled(room: Room, seat: SeatIndex): boolean {
