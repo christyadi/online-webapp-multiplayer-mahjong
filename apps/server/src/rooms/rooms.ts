@@ -91,7 +91,7 @@ export class RoomStore {
   readonly #scheduler: RoomScheduler;
 
   constructor(options: RoomStoreOptions = {}) {
-    this.#botDelayMs = options.botDelayMs ?? (() => randomInt(1_000, 5_001));
+    this.#botDelayMs = options.botDelayMs ?? (() => randomInt(2_000, 8_001));
     this.#clock = options.clock ?? Date.now;
     this.#codeFactory = options.codeFactory ?? generateRoomCode;
     this.#handFactory =
