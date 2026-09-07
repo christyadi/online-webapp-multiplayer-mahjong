@@ -114,3 +114,9 @@ These player-review improvements were resolved as part of the completed visual r
 - [x] Fix the completed-hand invite bug: a guest currently receives **This hand has already started** because `join` accepts only `lobby` rooms. During the three-minute `hand-ended` window, allow a valid invite to atomically replace an open/bot seat, reset the new guest’s readiness, and preserve private-hand visibility rules.
 - [x] Add an explicit lobby seat picker for East, South, West, and North. Show only available seats, keep first-free E/S/W/N as the no-preference fallback, and reject a simultaneous claim without changing either player’s membership.
 - [x] Verify host disconnect after results in two-human browser coverage: confirm the server transfers host to the longest-present connected human, does not auto-start by itself, and that the transferred host’s enabled auto-play starts exactly one rematch after 15 seconds with the correct rotated dealer.
+
+## Newly reported gameplay and responsive UI feedback (2026-09-07)
+
+- [ ] Fix Kong visibility during play: exposed Kongs must be rendered as public four-tile melds for every player, while concealed-Kong identities remain face-down to opponents until the hand ends; add regression coverage for both cases and for the final reveal.
+- [ ] Fix the end-of-hand opponent-hand inspection control becoming unresponsive after a rematch starts. Clear stale result-dialog/inspection state on every `handId` transition, keep the control bound to the active result hand, and verify it can be opened and closed again after starting a new hand.
+- [ ] Add a compact responsive top navigation/menu for mobile gameplay. Move settings, light/dark mode, How to play (question-mark action), connection status, and Leave game into the top menu; remove the bottom navigation/status bar and its Leave game action, preserve accessible 44px controls, and verify the table remains usable without page-level scrolling at 390×844 and 844×390.
