@@ -15,7 +15,34 @@ test("isolated guests keep distinct seats through joins and refresh", async ({
   try {
     const host = await newGuestPage(browser, contexts);
     await host.goto("/");
+    const landingTone = await host.locator(".home-page").evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return style.backgroundImage;
+    });
+    const landingCardTone = await host.locator(".home-card").evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        backgroundImage: style.backgroundImage,
+        borderTopWidth: style.borderTopWidth,
+      };
+    });
     await createRoom(host, "Same name");
+    expect(
+      await host
+        .locator(".lobby-page")
+        .evaluate((element) => window.getComputedStyle(element).backgroundImage),
+    ).toBe(landingTone);
+    expect(
+      await host.locator(".lobby-card").evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          backgroundImage: style.backgroundImage,
+          borderTopWidth: style.borderTopWidth,
+        };
+      }),
+    ).toEqual(landingCardTone);
     const inviteUrl = host.url();
 
     const guests: Page[] = [];

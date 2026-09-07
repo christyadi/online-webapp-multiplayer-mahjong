@@ -13,6 +13,7 @@ This document adapts the supplied `mahjong-game-page.html`, `mahjong-landing-pag
 - Rules and end-hand dialogs are portaled above the app, inert the background, trap Tab focus, close with Escape, and restore their owning control. Local tiles support mouse drag; on touch, holding a tile then tapping its destination avoids taking over ordinary horizontal rack panning. Sort hand is the compact non-drag arrangement action; individual grips and left/right movement buttons are intentionally absent.
 - The landing card owns a deep, readable dark-mode surface rather than retaining a light ivory gradient. Its first viewport offers distinct **Create a private room** and **Join a lobby** flows without turning either into a nested card.
 - The landing page is a table invitation, not a hero illustration: a compact Mahjong-tile emblem sits with the title while two equal, full-width entry lanes hold the prominent nickname/code fields and actions. The visual hierarchy must always favor creating or joining over decoration.
+- The landing page and private room lobby share the same wood-backed ivory material palette in both themes. The lobby retains its denser room-specific information, but it must read as the next step of the same private-table journey rather than as a separate product surface.
 - Light-mode player cards use four seat-tinted paper surfaces with explicit dark text/muted-text values. Controller prose is removed from the card; a compact, labeled robot icon appears only for bot-controlled seats.
 
 ## Purpose and tone
