@@ -23,6 +23,7 @@ import { createTileSet, shuffleTiles, type SeatIndex } from "../game/wall.js";
 import type { GuestSession } from "../identity/sessions.js";
 
 const ROOM_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const REMATCH_WINDOW_MS = 3 * 60 * 1000;
 
 type HumanSeat = {
   connected: boolean;
@@ -51,6 +52,8 @@ type Room = {
   noConnectedHumansSince: number | null;
   phase: "lobby" | "active";
   queue: Promise<void>;
+  rematchDeadline: number | null;
+  rematchTimerCancel: (() => void) | null;
   roomRevision: number;
   seats: [RoomSeat, RoomSeat, RoomSeat, RoomSeat];
 };
@@ -122,6 +125,8 @@ export class RoomStore {
       noConnectedHumansSince: null,
       phase: "lobby",
       queue: Promise.resolve(),
+      rematchDeadline: null,
+      rematchTimerCancel: null,
       roomRevision: 1,
       seats: [creator, null, null, null],
     };
@@ -199,6 +204,7 @@ export class RoomStore {
     if (!rematch && humans.some((human) => human.connected && !human.ready)) {
       throw new RoomError("players-not-ready", "Every connected player must be ready");
     }
+    this.cancelRematchExpiry(room);
     for (const seatIndex of [0, 1, 2, 3] as const) {
       room.seats[seatIndex] ??= { kind: "bot" };
     }
@@ -214,6 +220,7 @@ export class RoomStore {
     room.hand = this.#handFactory(dealer);
     room.nextDealer = rotateDealer(room.hand.dealer);
     room.phase = "active";
+    if (room.hand.phase === "hand-ended") this.scheduleRematchExpiry(room);
     room.lastActivityAt = this.#clock();
     room.roomRevision += 1;
     this.refreshAutomation(room, true);
@@ -247,6 +254,10 @@ export class RoomStore {
     room.lastActivityAt = this.#clock();
     this.ensureHost(room);
     this.updateConnectedState(room);
+    if (!this.hasHumanSeat(room)) {
+      this.deleteRoom(room);
+      return;
+    }
     room.roomRevision += 1;
     this.refreshAutomation(room, false);
     this.notify(code);
@@ -293,6 +304,10 @@ export class RoomStore {
       }
       room.lastActivityAt = this.#clock();
       this.updateConnectedState(room);
+      if (!this.hasHumanSeat(room)) {
+        this.deleteRoom(room);
+        return;
+      }
       room.roomRevision += 1;
       this.refreshAutomation(room, false);
       this.notify(code);
@@ -307,7 +322,16 @@ export class RoomStore {
         room.phase === "lobby" && now - room.lastActivityAt >= 2 * 60 * 60 * 1000;
       const emptyTooLong =
         room.noConnectedHumansSince !== null && now - room.noConnectedHumansSince >= 30 * 60 * 1000;
-      if (reachedLifetime || inactiveLobby || emptyTooLong) this.deleteRoom(room);
+      const resultExpired = room.rematchDeadline !== null && now >= room.rematchDeadline;
+      if (
+        !this.hasHumanSeat(room) ||
+        reachedLifetime ||
+        inactiveLobby ||
+        emptyTooLong ||
+        resultExpired
+      ) {
+        this.deleteRoom(room);
+      }
     }
   }
 
@@ -431,6 +455,13 @@ export class RoomStore {
     }
     room.roomRevision += 1;
     room.lastActivityAt = this.#clock();
+    if (result.state.phase === "hand-ended") {
+      if (!this.hasHumanSeat(room)) {
+        this.deleteRoom(room);
+        return;
+      }
+      this.scheduleRematchExpiry(room);
+    }
     if (!deferAutomation) {
       const nextDecision = result.state.phase === "hand-ended" ? null : result.state.decisionId;
       this.refreshAutomation(room, previousDecision !== nextDecision);
@@ -612,6 +643,34 @@ export class RoomStore {
     room.deadline = null;
   }
 
+  cancelRematchExpiry(room: Room): void {
+    room.rematchTimerCancel?.();
+    room.rematchTimerCancel = null;
+    room.rematchDeadline = null;
+  }
+
+  scheduleRematchExpiry(room: Room): void {
+    this.cancelRematchExpiry(room);
+    const deadline = this.#clock() + REMATCH_WINDOW_MS;
+    room.rematchDeadline = deadline;
+    this.scheduleRematchExpiryTimer(room, deadline);
+  }
+
+  scheduleRematchExpiryTimer(room: Room, deadline: number): void {
+    room.rematchTimerCancel = this.#scheduler(Math.max(0, deadline - this.#clock()), () => {
+      room.rematchTimerCancel = null;
+      void this.enqueue(room, () => {
+        if (this.#rooms.get(room.code) !== room || room.rematchDeadline !== deadline) return;
+        const remaining = deadline - this.#clock();
+        if (remaining > 0) {
+          this.scheduleRematchExpiryTimer(room, deadline);
+          return;
+        }
+        this.deleteRoom(room);
+      });
+    });
+  }
+
   #assertCode(code: string): void {
     if (!/^[a-z0-9]{12}$/.test(code)) throw new RoomError("room-not-found", "Room not found");
   }
@@ -646,6 +705,7 @@ export class RoomStore {
 
   deleteRoom(room: Room): void {
     this.cancelAutomation(room);
+    this.cancelRematchExpiry(room);
     this.#rooms.delete(room.code);
     for (const seat of room.seats) {
       if (seat?.kind === "human") this.#guestRooms.delete(seat.guestId);
@@ -722,6 +782,10 @@ export class RoomStore {
     if (hasConnectedHuman) room.noConnectedHumansSince = null;
     else room.noConnectedHumansSince ??= this.#clock();
   }
+
+  hasHumanSeat(room: Room): boolean {
+    return room.seats.some((seat) => seat?.kind === "human");
+  }
 }
 
 function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapshot {
@@ -748,6 +812,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
   return gameSnapshotSchema.parse({
     activeSeat: hand.phase === "awaiting-discard" ? hand.turn : null,
     deadline: room.deadline,
+    rematchDeadline: hand.phase === "hand-ended" ? room.rematchDeadline : null,
     decisionId: hand.phase === "hand-ended" ? null : hand.decisionId,
     dealer: hand.dealer,
     drawnTileId:

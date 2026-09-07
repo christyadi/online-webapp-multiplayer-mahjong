@@ -7,8 +7,8 @@ This document adapts the supplied `mahjong-game-page.html`, `mahjong-landing-pag
 - The table now uses a continuous shaded felt plane, framed by a compact wood HUD and a lower wood interaction dock. Brass is limited to dealer/wind markers, wall context, active state, and result emphasis.
 - The existing local SVG tiles now render with an ivory face, warm bevel, highlight, woven green back, drawn-tile separation, and perspective-preserving selection lift. The server reveals a drawn-tile ID only to its current owner.
 - The middle is a stable central pond with a physical wall stack, an explicit first-discard empty state, and a seat-color legend. The latest public discard remains in readable status text and uses restrained motion when motion is allowed.
-- The gameplay HUD replaces the previous generic title with room/seat context, dealer marker, accessible question-mark rules dialog, current action, and active-seat countdown. End-hand opponent tiles open in a dialog rather than reflowing the table.
-- A restrained six-piece winner treatment stays inside the result banner. All non-essential animations are opt-in through `prefers-reduced-motion: no-preference`.
+- The gameplay HUD replaces the previous generic title with room/seat context, dealer marker, accessible question-mark rules dialog, current action, active-seat countdown, and the attached light/dark control. End-hand opponent tiles open in a dialog rather than reflowing the table.
+- A completed hand opens a calm result dialog in the landing page’s wood-and-ivory material: it shows the winner or draw, winning hand, Play again, auto-play, the other players’ hands, and the remaining room window. Moving color trails and confetti are intentionally absent.
 - Public exposed melds remain visible in compact, horizontally scrollable strips at phone portrait and landscape sizes, pairing their physical tiles with readable names; responsive compaction never removes game information.
 - Rules and end-hand dialogs are portaled above the app, inert the background, trap Tab focus, close with Escape, and restore their owning control. Local tiles support mouse drag; on touch, holding a tile then tapping its destination avoids taking over ordinary horizontal rack panning. Sort hand is the compact non-drag arrangement action; individual grips and left/right movement buttons are intentionally absent.
 - The landing card owns a deep, readable dark-mode surface rather than retaining a light ivory gradient. Its first viewport offers distinct **Create a private room** and **Join a lobby** flows without turning either into a nested card.
@@ -60,12 +60,12 @@ The tile is an object, not a generic card:
 - Make the active seat obvious with text, a high-contrast border/glow, timer/progress, and a restrained motion cue. Color alone is insufficient.
 - Show the latest public action in readable language, such as “West discarded 5 of bamboo,” and announce it through an accessible live region.
 - When a discard is made, a short origin-to-pond motion may orient the eye. Keep the latest action visible long enough to read.
-- Celebrate a win with restrained confetti or a similarly focused effect tied to the result banner. It must not cover tiles or controls.
+- Treat the result dialog—not decorative animation—as the win moment. It should name the winner, make the hand legible, and give the next action clear prominence without covering or resizing the table.
 - Disable non-essential motion under `prefers-reduced-motion`; provide static status and result equivalents.
 
 ## Landing and recovery surfaces
 
-The supplied landing reference suggests a wood frame, felt hero, one oversized tile, an ivory material section, suit-specific accents, a short four-step flow, a brass CTA band, and a wood footer. If this direction is applied later, the existing create/join workflow remains the primary action; decorative sections must not push it below the first useful viewport. Recovery, lobby, and results screens should reuse the same material tokens rather than introduce a separate visual language.
+The supplied landing reference suggests a wood frame, felt hero, one oversized tile, an ivory material section, suit-specific accents, a short four-step flow, a brass CTA band, and a wood footer. If this direction is applied later, the existing create/join workflow remains the primary action; decorative sections must not push it below the first useful viewport. Recovery, lobby, and result-dialog screens should reuse the same material tokens rather than introduce a separate visual language.
 
 ## Accessibility and responsive acceptance
 

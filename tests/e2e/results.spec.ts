@@ -1,18 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test("a host can start the next hand from the completed result banner", async ({ page }) => {
+test("a host can start the next hand from the completed result dialog", async ({ page }) => {
   await startCompletedHand(page);
 
-  await expect(page.getByText("Draw hand", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Return to lobby" })).toBeEnabled();
-  await page.getByRole("button", { name: "Show other hands" }).click();
+  const resultDialog = page.getByRole("dialog", { name: "Draw hand" });
+  await expect(resultDialog).toBeVisible();
+  await expect(page.getByRole("button", { name: "Return to lobby" })).toHaveCount(0);
+  await resultDialog.getByRole("button", { name: "Show other hands" }).click();
   await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: "Other players’ hands" }).locator(".opponent-hand"),
   ).toHaveCount(3);
   await page.getByRole("button", { name: "Close Other players’ hands" }).click();
   await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toHaveCount(0);
-  const autoPlay = page.getByRole("checkbox", { name: /Auto-play next hand/ });
+  await expect(resultDialog).toBeVisible();
+  const autoPlay = resultDialog.getByRole("checkbox", { name: /Auto-play next hand/ });
   await expect(autoPlay).toBeChecked();
   await autoPlay.uncheck();
   await expect(autoPlay).not.toBeChecked();
@@ -23,15 +25,14 @@ test("a host can start the next hand from the completed result banner", async ({
     }
   });
   await page.waitForTimeout(16_000);
-  await expect(page.getByText("Draw hand", { exact: true })).toBeVisible();
+  await expect(resultDialog).toBeVisible();
   expect(rematchStarts).toBe(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Play again" }).click();
+  await resultDialog.getByRole("button", { name: "Play again" }).click();
 
-  await expect(page.getByText("Draw hand", { exact: true })).toBeHidden();
+  await expect(resultDialog).toBeHidden();
   await expect(page.locator(".table-felt")).toBeVisible();
-  await expect(page.locator(".result-banner")).toHaveCount(0);
   expect(rematchStarts).toBe(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
@@ -47,12 +48,12 @@ test("a completed hand automatically rematches after fifteen seconds by default"
       rematchStarts += 1;
     }
   });
-  await expect(page.getByText(/Auto-play next hand in \d+s/)).toBeVisible();
+  const resultDialog = page.getByRole("dialog", { name: "Draw hand" });
+  await expect(resultDialog.getByText(/Auto-play next hand in \d+s/)).toBeVisible();
   await page.waitForTimeout(14_000);
-  await expect(page.getByText("Draw hand", { exact: true })).toBeVisible();
-  await expect(page.getByText("Draw hand", { exact: true })).toBeHidden({ timeout: 20_000 });
+  await expect(resultDialog).toBeVisible();
+  await expect(resultDialog).toBeHidden({ timeout: 20_000 });
   await expect(page.locator(".table-felt")).toBeVisible();
-  await expect(page.locator(".result-banner")).toHaveCount(0);
   expect(rematchStarts).toBe(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

@@ -49,7 +49,7 @@ Visual-design and UX refinement are the active priorities. Public deployment is 
 - [x] Let the host return a completed table to the lobby, clearing bot seats so friends can join before the next hand.
 - [x] Release a host who disconnects on the results screen and transfer rematch and lobby controls to the next connected human.
 - [x] Run the integrated two-human/two-bot table flow at desktop Chromium, iPad Pro 11 Chromium, and Safari-engine sizes, including a live table reload/reconnect.
-- [x] Exercise the completed-hand rematch banner through a browser result flow before closing the cross-browser milestone.
+- [x] Exercise the completed-hand rematch dialog through a browser result flow before closing the cross-browser milestone.
 - [x] Exercise an in-browser Chow choice with its exact selector labels and confirm the exposed meld reaches both human players.
 - [x] Add a persisted light/dark theme toggle with system-preference fallback and readable contrast across landing, lobby, table, tiles, results, and status surfaces.
 
@@ -61,7 +61,7 @@ The attached HTML concepts and design-system note are recorded in [DESIGN.md](./
 - [x] Refine tile rendering as a physical object: consistent ivory bevel/depth, distinct woven back, perspective-preserving selected state, separated drawn tile, and stable small/medium/large proportions using the existing local SVG assets.
 - [x] Refine spatial hierarchy into top/side opponents, physical wall treatment, central discard pond, and lower local rack/action dock. Keep the pond stable, explain its empty state, and retain an owner-color legend.
 - [x] Add a readable latest public-action cue and an accessible live-region announcement. Use restrained origin-to-pond discard motion and an active-seat timer/glow that remain clear with reduced motion disabled.
-- [x] Add a restrained winner celebration tied to the result banner without obscuring tiles or controls, with a static reduced-motion fallback.
+- [x] Replace the moving winner treatment with a calm result dialog that uses the landing material, shows the winner and winning hand, and keeps rematch and opponent-hand controls together.
 - [x] Apply the landing reference selectively: wood frame, felt hero, one oversized tile gesture, ivory material/suit accents, and brass CTA hierarchy, while keeping create/join as the primary first-viewport workflow.
 - [x] Verify the material, hierarchy, dark mode, keyboard/touch reachability, and normal-turn no-scroll behavior at 1440×900, iPad Pro 11, 390×844, and 844×390.
 - [x] Preserve exposed melds in a compact, horizontally scrollable strip at both phone orientations, with readable text summaries of the tile names; never hide public Chow, Pung, or Kong information to save space.
@@ -85,6 +85,14 @@ The attached HTML concepts and design-system note are recorded in [DESIGN.md](./
 - [x] Add browser checks for dark landing and light player-card contrast, private lobby-code entry, bot icons, removed ordering chrome, and touch hold-then-tap ordering.
 - [x] Resolve the corrected review’s phone-scroll finding. The re-review found no unresolved critical, high, or medium issue in the landing, player-card, or revised ordering changes.
 
+## Room lifecycle and result-dialog feedback (2026-09-07)
+
+- [x] Remove a room immediately when its final human player leaves, without leaving a stale membership that blocks a new room.
+- [x] Give a completed room one server-owned three-minute rematch window. Expire it on time even after a lobby return, and cancel the expiry only when a valid next hand starts.
+- [x] Move the gameplay light/dark switch into the table header, leaving it fixed only on non-game screens.
+- [x] Replace the moving colored winner trails with a calm, landing-material result dialog containing the winner/draw state, winning hand, Play again, auto-play, other-hands, close, and room-expiry controls.
+- [x] Preserve keyboard dialog behavior: the result dialog traps focus, supports Escape and explicit close, restores its trigger, and can be reopened through **View result**.
+
 ## Future UX refinement backlog (captured 2026-09-06)
 
 These player-review improvements were resolved as part of the completed visual refinement. They remain here as acceptance history for later changes.
@@ -96,6 +104,12 @@ These player-review improvements were resolved as part of the completed visual r
 - [x] Consolidate the local player card, hand rack, and legal actions into one bottom interaction dock. Keep the hand primary, show action buttons only when available, and reduce persistent drag/sort guidance to a compact affordance.
 - [x] Improve player-card hierarchy with prominent text status, a strong active border/glow, and a timer/progress treatment. Color remains a secondary cue and is never the only way to identify the active player.
 - [x] Make turn ownership immediately legible with a persistent text label, high-contrast animated active-seat treatment, and a short public action cue such as **West discarded 5 of bamboo**. Animate a discard from the player edge into the central pool, keep the latest action visible long enough to read, and provide an equivalent live-region announcement; disable motion under `prefers-reduced-motion`.
-- [x] Add a restrained winner celebration (confetti or equivalent) when a hand ends. Tie it to the winner and result banner, keep controls usable, avoid obscuring tiles, and provide a reduced-motion/static fallback.
+- [x] Present a calm, readable result dialog when a hand ends. Name the winner, show the winning hand, keep controls usable, and avoid decorative moving trails that obscure the result or controls.
 - [x] Keep end-of-hand opponent-hand inspection in an overlay or expandable panel so revealing hands does not resize the table or push the local hand and controls out of view.
 - [x] Verify the revised hierarchy at 1440×900, iPad Pro 11, 390×844, and 844×390. The normal turn must fit without page scrolling; only intentionally long hand/discard collections may scroll inside their own regions.
+
+## Newly reported lobby feedback (2026-09-07)
+
+- [ ] Fix the completed-hand invite bug: a guest currently receives **This hand has already started** because `join` accepts only `lobby` rooms. During the three-minute `hand-ended` window, allow a valid invite to atomically replace an open/bot seat, reset the new guest’s readiness, and preserve private-hand visibility rules.
+- [ ] Add an explicit lobby seat picker for East, South, West, and North. Show only available seats, keep first-free E/S/W/N as the no-preference fallback, and reject a simultaneous claim without changing either player’s membership.
+- [ ] Verify host disconnect after results in two-human browser coverage: confirm the server transfers host to the longest-present connected human, does not auto-start by itself, and that the transferred host’s enabled auto-play starts exactly one rematch after 15 seconds with the correct rotated dealer.

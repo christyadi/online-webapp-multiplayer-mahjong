@@ -307,6 +307,20 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 - The first read-only review confirmed the visual, bot-icon, and private-lobby work, but found a high mobile defect: `touch-action: none` on every tile blocked the rack’s required horizontal panning. The correction restores `pan-x`, uses the hold-then-tap interaction above, and adds the offscreen-tile phone regression. The targeted portrait/landscape table flow, complete phone suite, tablet Chromium suite (9), and WebKit suite (9) all passed after correction.
 - The required corrected re-review found no remaining critical, high, or medium issue. It verified the pan/hold/tap arbitration, source-click suppression, offscreen-tile access, mouse drag, keyboard selection/discard, Sort hand, contrast, bot semantics, removed ordering chrome, and private lobby routing.
 
+## Room lifecycle and result-dialog feedback completed (2026-09-07)
+
+- Rooms now delete immediately when their final human seat leaves or disconnects from the lobby/results state, clearing guest membership so the same browser can create or join another room.
+- Completed hands now publish a server-clock rematch deadline and schedule exact three-minute room teardown. The deadline survives a return-to-lobby transition, is cancelled only by a valid next hand, and is also enforced by periodic cleanup.
+- Gameplay theme control is structurally attached to the table header; non-game recovery and entry surfaces retain the fixed control.
+- Replaced the moving winner trails and inline result banner with a landing-material result dialog. It names the winner or draw, renders the winning combination, shows the rematch countdown, and groups Play again, auto-play, and other-hands actions. The dialog remains keyboard-contained and can be reopened with **View result** after closing.
+- Verification: strict typecheck, lint, 92 Vitest tests, desktop Chromium (9), phone Chromium (18), tablet Chromium (9), and the dedicated result flow (2) pass. WebKit’s standard run had one 30-second timeout in the long ready-player flow; the completed partial run was not counted as a pass and should be rerun separately. Firefox remains deferred at the user’s direction.
+
+## New lobby feedback logged (2026-09-07)
+
+- Known bug: an invite opened after a hand finishes currently returns **This hand has already started**. The server only accepts joins while `phase === "lobby"`, and started rooms still contain bot seats, so the completed-hand invite path needs an explicit between-hand join policy.
+- Requested feature: add an East/South/West/North seat picker in the lobby. The planned behavior is to show open seats, validate the requested seat atomically on the server, and retain first-free E/S/W/N allocation when no preference is selected.
+- Verification request: after a results-screen host disconnects, confirm that the longest-present connected human becomes host, the server does not start a hand on its own, and the transferred host’s enabled client auto-play starts exactly one rematch after 15 seconds with the next dealer. Existing server coverage confirms the host transfer; the browser auto-rematch-after-transfer check remains open.
+
 ## Next exact step
 
-The completed design and plan work is ready for the user's manual Render configuration. Public verification resumes only once they provide the deployed URL. Firefox remains deferred.
+Implement and verify the three open lobby items above. Public deployment remains deliberately deferred for the user’s manual Render configuration, and Firefox remains deferred at the user’s direction.

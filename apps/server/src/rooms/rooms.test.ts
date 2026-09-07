@@ -75,13 +75,16 @@ describe("room lobby", () => {
     const room = store.create(guest(1), "Host");
     store.setReady(guest(1), room.code, true);
     store.start(guest(1), room.code);
-    expect(store.getGameSnapshot(guest(1), room.code).phase).toBe("hand-ended");
+    const completed = store.getGameSnapshot(guest(1), room.code);
+    expect(completed.phase).toBe("hand-ended");
+    expect(completed.rematchDeadline).not.toBeNull();
 
     const rematch = store.start(guest(1), room.code);
     expect(rematch.phase).toBe("active");
     expect(store.getGameSnapshot(guest(1), room.code)).toMatchObject({
       activeSeat: 1,
       phase: "awaiting-discard",
+      rematchDeadline: null,
     });
   });
 
@@ -196,6 +199,25 @@ describe("room lobby", () => {
     expect(store.join(guest(3), room.code, "Replacement").viewerSeat).toBe(0);
   });
 
+  it("removes a room as soon as its final human player leaves or disconnects", async () => {
+    const store = new RoomStore({ codeFactory: () => "emptyroom001" });
+    const first = store.create(guest(1), "First");
+
+    store.leave(guest(1), first.code);
+
+    expect(store.size).toBe(0);
+    expect(store.getCurrent(guest(1))).toBeNull();
+
+    const second = store.create(guest(2), "Second");
+    await store.disconnect(guest(2).guestId);
+
+    expect(store.size).toBe(0);
+    expect(store.getCurrent(guest(2))).toBeNull();
+    expect(() => store.getForGuest(guest(2), second.code)).toThrow(
+      expect.objectContaining({ code: "room-not-found" }),
+    );
+  });
+
   it("returns a capacity error without repurposing an existing room", () => {
     const store = new RoomStore({ codeFactory: () => "roomcode0005", maxRooms: 1 });
     store.create(guest(1), "One");
@@ -206,7 +228,7 @@ describe("room lobby", () => {
     expect(store.size).toBe(1);
   });
 
-  it("enforces one room per guest and expires empty, inactive, and old rooms", () => {
+  it("enforces one room per guest and expires inactive and old rooms", () => {
     let now = 0;
     let codeNumber = 0;
     const store = new RoomStore({
@@ -219,8 +241,6 @@ describe("room lobby", () => {
     );
 
     store.leave(guest(1), first.code);
-    now += 30 * 60 * 1000;
-    store.cleanupExpired();
     expect(store.size).toBe(0);
 
     const inactive = store.create(guest(2), "Two");
@@ -232,6 +252,57 @@ describe("room lobby", () => {
     now += 12 * 60 * 60 * 1000;
     store.cleanupExpired();
     expect(store.size).toBe(0);
+  });
+
+  it("removes a completed room at the three-minute deadline, including after a lobby return", () => {
+    let now = 0;
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000005", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      clock: () => now,
+      codeFactory: () => "rematchexp01",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = store.create(guest(1), "Host");
+    store.setReady(guest(1), room.code, true);
+    store.start(guest(1), room.code);
+
+    expect(store.getGameSnapshot(guest(1), room.code).rematchDeadline).toBe(180_000);
+    store.returnToLobby(guest(1), room.code);
+    now = 179_999;
+    store.cleanupExpired();
+    expect(store.size).toBe(1);
+
+    now = 180_000;
+    store.cleanupExpired();
+    expect(store.size).toBe(0);
+    expect(store.getCurrent(guest(1))).toBeNull();
+  });
+
+  it("uses the room scheduler to remove a completed room at the rematch deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000006", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      clock: Date.now,
+      codeFactory: () => "rematchtime1",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = store.create(guest(1), "Host");
+    store.setReady(guest(1), room.code, true);
+    store.start(guest(1), room.code);
+
+    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+
+    expect(store.size).toBe(0);
+    expect(store.getCurrent(guest(1))).toBeNull();
   });
 
   it("checks expiry before mutations so an old lobby cannot be revived", () => {

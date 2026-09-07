@@ -48,13 +48,17 @@ function readThemePreference(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function ThemeToggle({ theme, onToggle }: Readonly<{ onToggle: () => void; theme: Theme }>) {
+function ThemeToggle({
+  className = "",
+  theme,
+  onToggle,
+}: Readonly<{ className?: string; onToggle: () => void; theme: Theme }>) {
   const nextTheme = theme === "dark" ? "light" : "dark";
   return (
     <button
       aria-label={`Switch to ${nextTheme} mode`}
       aria-pressed={theme === "dark"}
-      className="theme-toggle"
+      className={`theme-toggle${className === "" ? "" : ` ${className}`}`}
       onClick={onToggle}
       title={`Switch to ${nextTheme} mode`}
       type="button"
@@ -81,17 +85,14 @@ function Root() {
   }, [theme]);
 
   return (
-    <>
-      <ThemeToggle
-        onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-        theme={theme}
-      />
-      <App />
-    </>
+    <App
+      onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+      theme={theme}
+    />
   );
 }
 
-function App() {
+function App({ onToggleTheme, theme }: Readonly<{ onToggleTheme: () => void; theme: Theme }>) {
   const { dispatch, state: serverState } = useServerState();
   const { game, room } = serverState;
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +108,7 @@ function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [realtimeReady, setRealtimeReady] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const pageThemeToggle = <ThemeToggle onToggle={onToggleTheme} theme={theme} />;
 
   const navigate = useCallback((nextPath: string) => {
     window.history.pushState({}, "", nextPath);
@@ -262,36 +264,48 @@ function App() {
   }, [refreshRoom]);
 
   if (loading)
-    return <StatusCard title="Opening the table…" message="Starting your guest session." />;
+    return (
+      <>
+        {pageThemeToggle}
+        <StatusCard title="Opening the table…" message="Starting your guest session." />
+      </>
+    );
 
   if (!sessionReady) {
     return (
-      <StatusCard
-        title="Unable to open the table"
-        message={error ?? "A guest session could not be started."}
-      />
+      <>
+        {pageThemeToggle}
+        <StatusCard
+          title="Unable to open the table"
+          message={error ?? "A guest session could not be started."}
+        />
+      </>
     );
   }
 
   if (!realtimeReady) {
     return (
-      <StatusCard
-        title={error === null ? "Connecting to the table…" : "Table control unavailable"}
-        message={
-          sessionReplaced
-            ? "This room is controlled from another tab. Take control only if you mean to move play here."
-            : (error ?? "Establishing the secure live connection.")
-        }
-        {...(sessionReplaced
-          ? { action: { label: "Take control here", onClick: takeControl } }
-          : {})}
-      />
+      <>
+        {pageThemeToggle}
+        <StatusCard
+          title={error === null ? "Connecting to the table…" : "Table control unavailable"}
+          message={
+            sessionReplaced
+              ? "This room is controlled from another tab. Take control only if you mean to move play here."
+              : (error ?? "Establishing the secure live connection.")
+          }
+          {...(sessionReplaced
+            ? { action: { label: "Take control here", onClick: takeControl } }
+            : {})}
+        />
+      </>
     );
   }
 
   if (roomExpired) {
     return (
       <main>
+        {pageThemeToggle}
         <section className="welcome-card" aria-labelledby="expired-title">
           <p className="eyebrow">Room closed</p>
           <h1 id="expired-title">Room expired</h1>
@@ -311,6 +325,7 @@ function App() {
         error={error}
         onError={setError}
         onExpired={expireRoom}
+        onToggleTheme={onToggleTheme}
         onLeave={() => {
           roomRequests.current.invalidate();
           occupiedRoomCode.current = null;
@@ -326,6 +341,7 @@ function App() {
         realtime={socket}
         room={room}
         setPending={setPending}
+        theme={theme}
       />
     );
   }
@@ -333,21 +349,25 @@ function App() {
   const inviteCode = inviteCodeFromPath(path);
   if (inviteCode !== null) {
     return (
-      <JoinRoom
-        code={inviteCode}
-        controllerId={controllerId}
-        error={error}
-        onJoined={refreshRoom}
-        onMutationStart={() => roomRequests.current.invalidate()}
-        pending={pending}
-        setError={setError}
-        setPending={setPending}
-      />
+      <>
+        {pageThemeToggle}
+        <JoinRoom
+          code={inviteCode}
+          controllerId={controllerId}
+          error={error}
+          onJoined={refreshRoom}
+          onMutationStart={() => roomRequests.current.invalidate()}
+          pending={pending}
+          setError={setError}
+          setPending={setPending}
+        />
+      </>
     );
   }
 
   return (
     <main className="home-page">
+      {pageThemeToggle}
       <section className="welcome-card home-card" aria-labelledby="page-title">
         <header className="home-intro">
           <div aria-hidden="true" className="home-hero-tile">
@@ -564,10 +584,12 @@ type LobbyProperties = Readonly<{
   onLeave: () => void;
   onInvalidateRoomRequests: () => void;
   onRefresh: () => Promise<void>;
+  onToggleTheme: () => void;
   pending: boolean;
   realtime: Socket | null;
   room: RoomView;
   setPending: (pending: boolean) => void;
+  theme: Theme;
 }>;
 
 function Lobby({
@@ -579,10 +601,12 @@ function Lobby({
   onLeave,
   onInvalidateRoomRequests,
   onRefresh,
+  onToggleTheme,
   pending,
   realtime,
   room,
   setPending,
+  theme,
 }: LobbyProperties) {
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [manualCopy, setManualCopy] = useState(false);
@@ -645,17 +669,18 @@ function Lobby({
         onError={onError}
         onLeave={leaveGame}
         onPlayAgain={() => void mutate(`/api/rooms/${room.code}/start`, {})}
-        onReturnToLobby={() => void mutate(`/api/rooms/${room.code}/return-to-lobby`, {})}
+        onToggleTheme={onToggleTheme}
         pending={pending}
         realtime={realtime}
         room={room}
+        theme={theme}
       />
     );
   }
 
   const copyInvite = async () => {
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      await navigator.clipboard.writeText(room.code);
       setCopyStatus("Invite link copied.");
       setManualCopy(false);
     } catch {
@@ -666,6 +691,7 @@ function Lobby({
 
   return (
     <main className="lobby-page">
+      <ThemeToggle onToggle={onToggleTheme} theme={theme} />
       <section className="lobby-card" aria-labelledby="lobby-title">
         <div className="lobby-heading">
           <div>
@@ -788,10 +814,11 @@ type TableProperties = Readonly<{
   onError: (message: string | null) => void;
   onLeave: () => void;
   onPlayAgain: () => void;
-  onReturnToLobby: () => void;
+  onToggleTheme: () => void;
   pending: boolean;
   realtime: Socket | null;
   room: RoomView;
+  theme: Theme;
 }>;
 
 function Table({
@@ -801,16 +828,18 @@ function Table({
   onError,
   onLeave,
   onPlayAgain,
-  onReturnToLobby,
+  onToggleTheme,
   pending,
   realtime,
   room,
+  theme,
 }: TableProperties) {
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [touchReorderSourceId, setTouchReorderSourceId] = useState<string | null>(null);
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
+  const [dismissedResultHandId, setDismissedResultHandId] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
   const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
@@ -891,6 +920,12 @@ function Table({
       ? null
       : Math.max(0, game.deadline - game.serverTime - (clock - game.serverTime));
   const seconds = deadlineRemaining === null ? null : Math.ceil(deadlineRemaining / 1000);
+  const rematchRemaining =
+    game.rematchDeadline === null
+      ? null
+      : Math.max(0, game.rematchDeadline - game.serverTime - (clock - game.serverTime));
+  const rematchSeconds = rematchRemaining === null ? null : Math.ceil(rematchRemaining / 1000);
+  const resultVisible = game.result !== null && dismissedResultHandId !== game.handId;
 
   useEffect(() => {
     playAgainRef.current = onPlayAgain;
@@ -905,6 +940,8 @@ function Table({
       window.clearTimeout(autoPlayTimeoutRef.current);
       autoPlayTimeoutRef.current = null;
     }
+    setShowOpponentTiles(false);
+    setDismissedResultHandId(null);
     playAgainRef.current();
   }, []);
 
@@ -928,10 +965,10 @@ function Table({
   }, [autoPlayAgain, canPlayAgain, game.phase, pending, startNextHand]);
 
   useEffect(() => {
-    if (game.phase === "hand-ended" || game.deadline === null) return;
+    if (game.deadline === null && game.rematchDeadline === null) return;
     const timer = window.setInterval(() => setClock(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, [game.deadline, game.phase]);
+  }, [game.deadline, game.rematchDeadline]);
 
   useEffect(() => {
     const previous = previousGame.current;
@@ -1003,6 +1040,16 @@ function Table({
               <span>{game.phase === "hand-ended" ? "Hand complete" : "Live hand"}</span>
               {seconds === null ? null : <strong>{seconds}s</strong>}
             </div>
+            {game.result === null || resultVisible ? null : (
+              <button
+                aria-controls="hand-result"
+                className="table-result-trigger"
+                onClick={() => setDismissedResultHandId(null)}
+                type="button"
+              >
+                View result
+              </button>
+            )}
             <button
               aria-controls="table-rules"
               aria-expanded={showRules}
@@ -1014,6 +1061,7 @@ function Table({
             >
               <span aria-hidden="true">?</span>
             </button>
+            <ThemeToggle className="table-theme-toggle" onToggle={onToggleTheme} theme={theme} />
           </div>
         </header>
 
@@ -1130,18 +1178,18 @@ function Table({
           </div>
         </div>
 
-        {game.result === null ? null : (
-          <ResultBanner
+        {!resultVisible ? null : (
+          <ResultDialog
             autoPlayAgain={autoPlayAgain}
             autoPlaySeconds={autoPlaySeconds}
             canPlayAgain={canPlayAgain}
             game={game}
+            onClose={() => setDismissedResultHandId(game.handId)}
             onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
-            onToggleOpponentTiles={() => setShowOpponentTiles((visible) => !visible)}
+            onShowOpponentTiles={() => setShowOpponentTiles(true)}
             onPlayAgain={startNextHand}
-            onReturnToLobby={onReturnToLobby}
             pending={pending}
-            showOpponentTiles={showOpponentTiles}
+            rematchSeconds={rematchSeconds}
           />
         )}
         {showRules ? <RulesDialog onClose={() => setShowRules(false)} /> : null}
@@ -1374,11 +1422,13 @@ function OpponentHandsDialog({
 }
 
 function TableDialog({
+  className = "",
   children,
   id,
   onClose,
   title,
 }: Readonly<{
+  className?: string;
   children: ReactNode;
   id: string;
   onClose: () => void;
@@ -1454,7 +1504,7 @@ function TableDialog({
       <section
         aria-labelledby={`${id}-title`}
         aria-modal="true"
-        className="table-dialog"
+        className={`table-dialog${className === "" ? "" : ` ${className}`}`}
         id={id}
         onMouseDown={(event) => event.stopPropagation()}
         ref={dialog}
@@ -1725,90 +1775,89 @@ function ActionBar({
   );
 }
 
-function ResultBanner({
+function ResultDialog({
   autoPlayAgain,
   autoPlaySeconds,
   canPlayAgain,
   game,
+  onClose,
   onToggleAutoPlay,
-  onToggleOpponentTiles,
+  onShowOpponentTiles,
   onPlayAgain,
-  onReturnToLobby,
   pending,
-  showOpponentTiles,
+  rematchSeconds,
 }: Readonly<{
   autoPlayAgain: boolean;
   autoPlaySeconds: number | null;
   canPlayAgain: boolean;
   game: GameSnapshot;
+  onClose: () => void;
   onToggleAutoPlay: () => void;
-  onToggleOpponentTiles: () => void;
+  onShowOpponentTiles: () => void;
   onPlayAgain: () => void;
-  onReturnToLobby: () => void;
   pending: boolean;
-  showOpponentTiles: boolean;
+  rematchSeconds: number | null;
 }>) {
   const result = game.result;
   if (result === null) return null;
+  const winner = result.kind === "win" ? playerNicknameForSeat(game, result.winner) : null;
   return (
-    <div className={`result-banner${result.kind === "win" ? " is-win" : ""}`}>
-      {result.kind === "win" ? (
-        <span aria-hidden="true" className="winner-celebration">
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-        </span>
-      ) : null}
-      <div>
-        <strong>{result.kind === "draw" ? "Draw hand" : `${seatName(result.winner)} wins`}</strong>
-        <span>
-          {result.kind === "draw"
-            ? "The wall is empty."
-            : `Win by ${result.source.replaceAll("-", " ")}.`}
-        </span>
+    <TableDialog
+      className="result-dialog"
+      id="hand-result"
+      onClose={onClose}
+      title={result.kind === "draw" ? "Draw hand" : `${winner ?? seatName(result.winner)} wins`}
+    >
+      <p className="result-eyebrow">Hand complete</p>
+      <div className="result-summary">
+        {result.kind === "draw" ? (
+          <p>The wall is empty. This hand ends in a draw.</p>
+        ) : (
+          <>
+            <strong>
+              {winner} · {seatName(result.winner)}
+            </strong>
+            <p>Win by {result.source.replaceAll("-", " ")}.</p>
+          </>
+        )}
         {result.kind === "win" ? <WinningCombination decomposition={result.decomposition} /> : null}
       </div>
-      <label className="auto-play-option">
-        <input
-          checked={autoPlayAgain}
-          disabled={!canPlayAgain || pending}
-          onChange={onToggleAutoPlay}
-          type="checkbox"
-        />
-        {canPlayAgain
-          ? `Auto-play next hand${autoPlayAgain && autoPlaySeconds !== null ? ` in ${String(autoPlaySeconds)}s` : ""}`
-          : "Waiting for host"}
-      </label>
-      <button
-        className="secondary"
-        disabled={!canPlayAgain || pending}
-        onClick={onPlayAgain}
-        type="button"
-      >
-        {canPlayAgain ? (pending ? "Starting…" : "Play again") : "Waiting for host"}
-      </button>
-      <button
-        className="text-button"
-        disabled={!canPlayAgain || pending}
-        onClick={onReturnToLobby}
-        type="button"
-      >
-        {canPlayAgain ? "Return to lobby" : "Waiting for host"}
-      </button>
-      <button
-        aria-controls="opponent-hands"
-        aria-expanded={showOpponentTiles}
-        className="secondary"
-        onClick={onToggleOpponentTiles}
-        type="button"
-      >
-        {showOpponentTiles ? "Hide other hands" : "Show other hands"}
-      </button>
-    </div>
+      <p className="result-expiry" role="status">
+        {rematchSeconds === null
+          ? "Start another hand before this room closes."
+          : `Room closes in ${formatRemainingTime(rematchSeconds)} unless the host starts another hand.`}
+      </p>
+      <div className="result-actions">
+        <button disabled={!canPlayAgain || pending} onClick={onPlayAgain} type="button">
+          {canPlayAgain ? (pending ? "Starting…" : "Play again") : "Waiting for host"}
+        </button>
+        <label className="auto-play-option">
+          <input
+            checked={autoPlayAgain}
+            disabled={!canPlayAgain || pending}
+            onChange={onToggleAutoPlay}
+            type="checkbox"
+          />
+          {canPlayAgain
+            ? `Auto-play next hand${autoPlayAgain && autoPlaySeconds !== null ? ` in ${String(autoPlaySeconds)}s` : ""}`
+            : "Waiting for host"}
+        </label>
+        <button
+          aria-controls="opponent-hands"
+          className="secondary"
+          onClick={onShowOpponentTiles}
+          type="button"
+        >
+          Show other hands
+        </button>
+      </div>
+    </TableDialog>
   );
+}
+
+function formatRemainingTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function WinningCombination({

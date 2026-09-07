@@ -13,3 +13,9 @@
 - Apply the supplied visual direction as a material and hierarchy system, not a demo clone: preserve local SVGs, real snapshots, and system fonts while adding a wood/felt/ivory/brass presentation, compact table HUD, local-only drawn-tile cue, central-pond activity feedback, modal rules/results inspection, and reduced-motion-safe celebratory feedback.
 - Treat public meld visibility/readability, 44×44 touch targets, and full dialog focus isolation as non-negotiable responsive requirements. Reduce artwork density or use bounded internal scrolling on small screens rather than hiding melds or shrinking interactive controls; mouse drag and touch hold-then-tap placement are the ordering interactions, with a visible Sort hand action instead of per-tile grips or directional buttons.
 - Treat the dark landing card and light player panels as their own semantic surfaces with explicit foreground/background pairs. Do not rely on a globally inherited text color against a component-specific gradient. A bot icon may convey bot control visually, but it retains an accessible name.
+
+## 2026-09-07
+
+- Treat a completed (`hand-ended`) room as a joinable between-hand state until its three-minute rematch deadline. A joining guest may atomically replace an open or bot seat; a hand that is still progressing remains closed to new guests. This supersedes the earlier “lobby only” join wording.
+- Let lobby players request East, South, West, or North explicitly. Keep first-free E/S/W/N allocation as the default when no preference is supplied, and reject a requested seat if another mutation claims it first.
+- If the host disconnects after a hand ends, the server transfers host controls to the longest-present connected human but does not start a hand itself. The transferred host’s client may perform the existing 15-second auto-rematch; a dedicated two-human browser regression must verify that it starts at most once and uses the next dealer correctly.
