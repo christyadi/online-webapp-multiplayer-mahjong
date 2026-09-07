@@ -348,3 +348,10 @@ Complete remaining visual-direction work and the final stabilization audit. Publ
 - Added `POST /api/rooms/:code/seat` with strict command replay, session/controller authorization, atomic open-seat validation, lobby-only enforcement, and readiness reset after movement. Occupied, malformed, and active-hand targets leave membership unchanged.
 - Verification: the targeted RoomStore suite (18 tests), targeted Chromium seat-movement flow, Prettier, ESLint, and strict typecheck pass. Firefox remains deferred at the user’s direction.
 - Follow-up browser evidence: the previously failing WebKit smoke run now passes 9/9 tests in 28 seconds; standard Chromium passes 10/10 tests after the lobby movement change.
+
+## Final stabilization audit (2026-09-07)
+
+- Preserved immutable per-seat hand participants for completed-hand snapshots, so releasing a disconnected seat or refilling it during the rematch window cannot crash result views or attribute the old hand to the new guest. Added regressions for released result seats, refilled seats, historical names, and private result visibility.
+- Removed normally disconnected controller IDs after their grace period while retaining superseded-controller protection. Added coverage for 64 sequential reloads followed by a fresh connection.
+- Reordered the long WebKit table check so the human discard occurs before slow visual-dialog assertions; the production 30-second deadline remains unchanged. The focused WebKit flow passes.
+- Verification: 100 Vitest tests, strict typecheck, ESLint, Prettier, and production build pass. Firefox and public deployment remain deferred at the user's direction.

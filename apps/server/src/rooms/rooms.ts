@@ -41,6 +41,10 @@ type HumanSeat = {
 
 type BotSeat = Readonly<{ kind: "bot" }>;
 type RoomSeat = HumanSeat | BotSeat | null;
+// Seats may be released or refilled after a hand ends, so result snapshots retain
+// the identity that actually played each seat instead of reading mutable room seats.
+type HandParticipant = Readonly<{ guestId: string | null; nickname: string | null }>;
+type HandParticipants = [HandParticipant, HandParticipant, HandParticipant, HandParticipant];
 
 type Room = {
   botTimerCancels: Map<SeatIndex, () => void>;
@@ -51,6 +55,7 @@ type Room = {
   deadline: number | null;
   deadlineTimerCancel: (() => void) | null;
   hand: HandState | null;
+  handParticipants: HandParticipants | null;
   lastActivityAt: number;
   nextDealer: SeatIndex | null;
   noConnectedHumansSince: number | null;
@@ -124,6 +129,7 @@ export class RoomStore {
       deadline: null,
       deadlineTimerCancel: null,
       hand: null,
+      handParticipants: null,
       lastActivityAt: now,
       nextDealer: null,
       noConnectedHumansSince: null,
@@ -256,6 +262,7 @@ export class RoomStore {
         return dealerIndex as SeatIndex;
       })();
     room.hand = this.#handFactory(dealer);
+    room.handParticipants = participantsFor(room.seats);
     for (const occupant of room.seats) {
       if (occupant?.kind === "human") occupant.joinedHandId = room.hand.handId;
     }
@@ -279,6 +286,7 @@ export class RoomStore {
       throw new RoomError("host-only", "Only the host can return the table to the lobby");
     this.cancelAutomation(room);
     room.hand = null;
+    room.handParticipants = null;
     room.phase = "lobby";
     this.resetLobbySeats(room);
     room.lastActivityAt = this.#clock();
@@ -849,7 +857,9 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
   const hand = room.hand;
   if (hand === null) throw new Error("Active hand invariant failed");
   const viewer = room.seats[viewerSeat];
-  const viewerPlayedHand = viewer?.kind === "human" && viewer.joinedHandId === hand.handId;
+  const viewerParticipant = room.handParticipants?.[viewerSeat];
+  const viewerPlayedHand =
+    viewer?.kind === "human" && viewerParticipant?.guestId === viewer.guestId;
   const revealAll = hand.phase === "hand-ended" && viewerPlayedHand;
   const pendingDiscard =
     hand.phase === "awaiting-discard-claims"
@@ -885,16 +895,19 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
     pendingDiscard,
     phase: hand.phase,
     players: hand.players.map((player, seat) => {
-      const occupant = room.seats[seat];
-      if (occupant === null || occupant === undefined) {
-        throw new Error("Active seat invariant failed");
-      }
+      const participant = room.handParticipants?.[seat];
+      if (participant === undefined) throw new Error("Hand participant invariant failed");
+      const currentSeat = room.seats[seat];
+      const currentParticipant =
+        currentSeat?.kind === "human" && currentSeat.guestId === participant.guestId
+          ? currentSeat
+          : null;
       return {
         concealedCount: player.concealed.length,
         concealedTiles:
           revealAll || (viewerPlayedHand && seat === viewerSeat) ? player.concealed : null,
-        connected: occupant.kind === "human" && occupant.connected,
-        controller: occupant.kind === "bot" || !occupant.connected ? "bot" : "human",
+        connected: currentParticipant?.connected ?? false,
+        controller: currentParticipant?.connected === true ? "human" : "bot",
         discards: player.discards,
         melds: player.melds.map((meld) => ({
           concealed: meld.concealed,
@@ -905,7 +918,7 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
               ? null
               : meld.tiles,
         })),
-        nickname: occupant.kind === "human" ? occupant.nickname : null,
+        nickname: participant.nickname,
         seat,
       };
     }),
@@ -917,6 +930,14 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
     waitingSeats: waitingSeatsFor(hand),
     wallCount: hand.wall.length,
   });
+}
+
+function participantsFor(seats: Room["seats"]): HandParticipants {
+  return seats.map((seat) =>
+    seat?.kind === "human"
+      ? { guestId: seat.guestId, nickname: seat.nickname }
+      : { guestId: null, nickname: null },
+  ) as HandParticipants;
 }
 
 function orderedDiscards(hand: HandState): { seat: SeatIndex; tile: PhysicalTile }[] {

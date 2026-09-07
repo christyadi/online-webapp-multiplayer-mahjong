@@ -161,6 +161,42 @@ describe("room lobby", () => {
     expect(store.getGameSnapshot(guest(2), room.code).result).toBeNull();
   });
 
+  it("keeps completed-hand participants stable when a released seat is refilled", async () => {
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000008", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      codeFactory: () => "resultstable",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = store.create(guest(1), "Host");
+    store.join(guest(2), room.code, "Friend");
+    store.setReady(guest(1), room.code, true);
+    store.setReady(guest(2), room.code, true);
+    store.start(guest(1), room.code);
+
+    await store.disconnect(guest(2).guestId);
+    const hostResult = store.getGameSnapshot(guest(1), room.code);
+    expect(hostResult.players[1]).toMatchObject({
+      connected: false,
+      controller: "bot",
+      nickname: "Friend",
+    });
+    expect(hostResult.players.every((player) => player.concealedTiles !== null)).toBe(true);
+
+    store.join(guest(3), room.code, "New guest", 1);
+    const newGuestResult = store.getGameSnapshot(guest(3), room.code);
+    expect(newGuestResult.players[1]).toMatchObject({
+      connected: false,
+      controller: "bot",
+      nickname: "Friend",
+    });
+    expect(newGuestResult.players.every((player) => player.concealedTiles === null)).toBe(true);
+    expect(newGuestResult.result).toBeNull();
+  });
+
   it("returns a completed table to a ready-reset lobby and clears bot seats", () => {
     const ended: HandEndedState = {
       ...startHand("00000000-0000-4000-8000-000000000003", 0, createTileSet()),
@@ -242,6 +278,11 @@ describe("room lobby", () => {
     const friend = store.getForGuest(guest(2), room.code);
     expect(friend.seats[0]).toBeNull();
     expect(friend.seats[1]).toMatchObject({ host: true, kind: "human" });
+    expect(store.getGameSnapshot(guest(2), room.code).players[0]).toMatchObject({
+      connected: false,
+      controller: "bot",
+      nickname: "Host",
+    });
     expect(store.returnToLobby(guest(2), room.code)).toMatchObject({ phase: "lobby" });
   });
 

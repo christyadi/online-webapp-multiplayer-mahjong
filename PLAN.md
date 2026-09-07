@@ -122,3 +122,7 @@ These player-review improvements were resolved as part of the completed visual r
 - [x] Keep the central discard pond in chronological play order rather than grouping or sorting tiles by player. The newest discard must remain identifiable as the latest action, while older tiles preserve the sequence in which they were discarded.
 - [x] Remove visible tile-name text from the public Pung, Chow/Chuw, and Kong melds. Show the tile faces only (retain non-visible accessible labels where needed), and verify the compact melds remain identifiable for every player.
 - [x] Change turn progression to a consistent counter-clockwise seat sequence. Apply the same order to normal draws, discard claims, active-player indicators, timers, and dealer rotation, and add a full-loop regression test for the four seats.
+
+## Newly reported Kong visibility bug (2026-09-07)
+
+- [ ] Fix exposed Kong visibility for opponents: the Kong owner can currently see the meld, but other players cannot, while Chow and Pung melds are visible to everyone. Preserve concealed-Kong privacy and add a regression test covering both the owner and opponent snapshots.

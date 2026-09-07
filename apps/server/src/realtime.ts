@@ -244,6 +244,7 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
         disconnectTimers.delete(session.guestId);
         if (activeSockets.get(session.guestId)?.id !== socket.id) return;
         activeSockets.delete(session.guestId);
+        releaseKnownController(knownControllers, session.guestId, controllerId);
         options.sessionStore.releaseController(session.guestId, controllerId);
         void options.roomStore.disconnect(session.guestId).catch(() => {
           process.stderr.write("Room disconnect failed\n");
@@ -259,6 +260,17 @@ export function configureRealtime(server: RealtimeServer, options: RealtimeOptio
     for (const timer of disconnectTimers.values()) clearTimeout(timer);
     disconnectTimers.clear();
   };
+}
+
+function releaseKnownController(
+  knownControllers: Map<string, Set<string>>,
+  guestId: string,
+  controllerId: string,
+): void {
+  const known = knownControllers.get(guestId);
+  if (known === undefined) return;
+  known.delete(controllerId);
+  if (known.size === 0) knownControllers.delete(guestId);
 }
 
 function consumeCommandRate(

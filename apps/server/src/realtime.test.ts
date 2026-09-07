@@ -287,6 +287,44 @@ describe("Socket.IO game protocol", () => {
       await harness.close();
     }
   });
+
+  it("releases normally disconnected controller IDs for later reloads", async () => {
+    const harness = await createHarness(false);
+    let finalClient: TestClient | null = null;
+    try {
+      for (let attempt = 0; attempt < 64; attempt += 1) {
+        const client = connect(harness.url, {
+          auth: { controllerId: uuid(9_000 + attempt) },
+          autoConnect: false,
+          extraHeaders: {
+            Cookie: `${GUEST_COOKIE_NAME}=${harness.tokens[0]}`,
+            Origin: harness.origin,
+          },
+          transports: ["websocket"],
+        });
+        client.connect();
+        await waitForConnect(client);
+        client.disconnect();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+
+      finalClient = connect(harness.url, {
+        auth: { controllerId: uuid(9_100) },
+        autoConnect: false,
+        extraHeaders: {
+          Cookie: `${GUEST_COOKIE_NAME}=${harness.tokens[0]}`,
+          Origin: harness.origin,
+        },
+        transports: ["websocket"],
+      });
+      finalClient.connect();
+      await waitForConnect(finalClient);
+      expect(finalClient.connected).toBe(true);
+    } finally {
+      finalClient?.disconnect();
+      await harness.close();
+    }
+  });
 });
 
 async function createHarness(prepareRoom = true): Promise<
