@@ -355,3 +355,7 @@ Complete remaining visual-direction work and the final stabilization audit. Publ
 - Removed normally disconnected controller IDs after their grace period while retaining superseded-controller protection. Added coverage for 64 sequential reloads followed by a fresh connection.
 - Reordered the long WebKit table check so the human discard occurs before slow visual-dialog assertions; the production 30-second deadline remains unchanged. The focused WebKit flow passes.
 - Verification: 100 Vitest tests, strict typecheck, ESLint, Prettier, and production build pass. Firefox and public deployment remain deferred at the user's direction.
+
+## Exposed Kong visibility verification (2026-09-08)
+
+- Confirmed that only `concealed: true` Kongs are hidden from opponents. Added a direct owner/opponent snapshot regression for exposed Kongs, alongside the existing browser flow for an added Kong; both render all four exposed tiles for every player.

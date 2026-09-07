@@ -1703,11 +1703,7 @@ function publicActionSince(previous: GameSnapshot, game: GameSnapshot): string |
       previous.players.find((candidate) => candidate.seat === player.seat)?.melds ?? [];
     const changedMeld = player.melds.find((meld, index) => {
       const previousMeld = previousMelds.at(index);
-      return (
-        previousMeld === undefined ||
-        previousMeld.kind !== meld.kind ||
-        previousMeld.tileCount !== meld.tileCount
-      );
+      return previousMeld?.kind !== meld.kind || previousMeld.tileCount !== meld.tileCount;
     });
     if (changedMeld !== undefined) return meldActionLabel(game, player.seat, changedMeld.kind);
   }

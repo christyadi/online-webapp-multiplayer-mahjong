@@ -359,6 +359,31 @@ describe("queued room gameplay", () => {
     for (const tile of kongTiles) expect(opponentPayload).not.toContain(tile.id);
   });
 
+  it("shows an opponent's exposed kong to every player", () => {
+    const initial = startHand(uuid(), 0, createTileSet());
+    const controlled = structuredClone(initial);
+    const kongTiles = controlled.wall.filter((tile) => tile.type === "white");
+    controlled.wall = controlled.wall.filter((tile) => tile.type !== "white");
+    if (kongTiles.length !== 4) throw new Error("Expected four white dragons in the wall");
+    const owner = controlled.players[1];
+    while (owner.concealed.length > 10) {
+      const moved = owner.concealed.pop();
+      if (moved === undefined) throw new Error("Expected owner tile");
+      controlled.wall.unshift(moved);
+    }
+    owner.melds.push({ concealed: false, kind: "kong", tiles: kongTiles });
+    const store = new RoomStore({
+      codeFactory: () => "gamecode0004",
+      handFactory: () => structuredClone(controlled),
+    });
+    const room = startRoom(store, 2);
+
+    const opponentView = store.getGameSnapshot(guest(0), room.code);
+    const ownerView = store.getGameSnapshot(guest(1), room.code);
+    expect(opponentView.players[1].melds[0]?.tiles).toEqual(kongTiles);
+    expect(ownerView.players[1].melds[0]?.tiles).toEqual(kongTiles);
+  });
+
   it("sends central discards in play order instead of grouping them by seat", () => {
     const controlled = startHand(uuid(), 0, createTileSet());
     const eastTile = controlled.players[0].concealed.shift();
