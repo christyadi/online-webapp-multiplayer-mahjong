@@ -75,6 +75,7 @@ The attached HTML concepts and design-system note are recorded in [DESIGN.md](./
 
 ## Latest landing and table feedback (2026-09-07)
 
+- [x] Rebalance the landing page so the Mahjong tile is a compact title emblem and the equal create/join entry lanes—with full-width, 52px-or-taller controls—carry the visual hierarchy.
 - [x] Give the dark landing card its own high-contrast material surface rather than inheriting a light ivory treatment.
 - [x] Give light-mode player cards distinct seat-tinted fills with dark readable text and metadata.
 - [x] Replace reconnect/controller prose in player cards with an accessible bot icon only when a bot controls that seat.

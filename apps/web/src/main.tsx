@@ -349,55 +349,61 @@ function App() {
   return (
     <main className="home-page">
       <section className="welcome-card home-card" aria-labelledby="page-title">
-        <div aria-hidden="true" className="home-hero-tile">
-          <TileArt tile={HOME_TILE} />
-        </div>
-        <div className="home-content">
-          <p className="eyebrow">Private games for friends</p>
-          <h1 id="page-title">Mahjong Together</h1>
-          <p>Simple Chinese house rules for one to four people. Empty seats are filled by bots.</p>
-          <div className="home-lobby-options">
-            <section className="home-lobby-action" aria-labelledby="create-room-title">
-              <h2 id="create-room-title">Create a private room</h2>
-              <p>Start a table and send the invite code to friends.</p>
-              <NicknameForm
-                buttonLabel="Create a private room"
-                disabled={pending}
-                error={error}
-                fieldId="create-room-nickname"
-                onSubmit={async (nickname) => {
-                  roomRequests.current.invalidate();
-                  setPending(true);
-                  setError(null);
-                  try {
-                    const created = await requestJson(
-                      "/api/rooms",
-                      lobbyMutationAcknowledgementSchema,
-                      controllerId,
-                      {
-                        body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
-                        headers: { "content-type": "application/json" },
-                        method: "POST",
-                      },
-                    );
-                    navigate(`/room/${created.roomCode}`);
-                    await refreshRoom();
-                  } catch (caught) {
-                    setError(errorMessage(caught));
-                  } finally {
-                    setPending(false);
-                  }
-                }}
-              />
-            </section>
-            <section className="home-lobby-action" aria-labelledby="join-lobby-title">
-              <h2 id="join-lobby-title">Join a lobby</h2>
-              <p>Enter the 12-character code from a friend’s invitation.</p>
-              <LobbyCodeForm onJoin={(code) => navigate(`/room/${code}`)} />
-            </section>
+        <header className="home-intro">
+          <div aria-hidden="true" className="home-hero-tile">
+            <TileArt tile={HOME_TILE} />
           </div>
-          <p className="house-rules-note">No accounts, scoring, money, or matchmaking.</p>
+          <div className="home-intro-copy">
+            <p className="eyebrow">Private games for friends</p>
+            <h1 id="page-title">Mahjong Together</h1>
+            <p>
+              Start a table or join a friend with an invite code. Empty seats are filled by bots.
+            </p>
+          </div>
+        </header>
+        <div className="home-lobby-options">
+          <section className="home-lobby-action" aria-labelledby="create-room-title">
+            <p className="home-action-kicker">Open a new table</p>
+            <h2 id="create-room-title">Create a private room</h2>
+            <p>Choose a nickname, then share your invite code with friends.</p>
+            <NicknameForm
+              buttonLabel="Create a private room"
+              disabled={pending}
+              error={error}
+              fieldId="create-room-nickname"
+              onSubmit={async (nickname) => {
+                roomRequests.current.invalidate();
+                setPending(true);
+                setError(null);
+                try {
+                  const created = await requestJson(
+                    "/api/rooms",
+                    lobbyMutationAcknowledgementSchema,
+                    controllerId,
+                    {
+                      body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
+                      headers: { "content-type": "application/json" },
+                      method: "POST",
+                    },
+                  );
+                  navigate(`/room/${created.roomCode}`);
+                  await refreshRoom();
+                } catch (caught) {
+                  setError(errorMessage(caught));
+                } finally {
+                  setPending(false);
+                }
+              }}
+            />
+          </section>
+          <section className="home-lobby-action" aria-labelledby="join-lobby-title">
+            <p className="home-action-kicker">Use an invitation</p>
+            <h2 id="join-lobby-title">Join a lobby</h2>
+            <p>Enter the 12-character code from a friend’s invitation.</p>
+            <LobbyCodeForm onJoin={(code) => navigate(`/room/${code}`)} />
+          </section>
         </div>
+        <p className="house-rules-note">No accounts, scoring, money, or matchmaking.</p>
       </section>
     </main>
   );

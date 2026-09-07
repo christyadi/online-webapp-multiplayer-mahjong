@@ -7,6 +7,18 @@ test("serves the built home page and health endpoint", async ({ page, request })
   await expect(page.getByRole("heading", { name: "Join a lobby" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Join lobby" })).toBeEnabled();
 
+  const [tileBox, createButtonBox, joinButtonBox] = await Promise.all([
+    page.locator(".home-hero-tile").boundingBox(),
+    page.getByRole("button", { name: "Create a private room" }).boundingBox(),
+    page.getByRole("button", { name: "Join lobby" }).boundingBox(),
+  ]);
+  if (tileBox === null || createButtonBox === null || joinButtonBox === null)
+    throw new Error("Landing-page layout controls are unavailable");
+  expect(tileBox.width).toBeLessThan(Math.min(createButtonBox.width, joinButtonBox.width) / 2);
+  expect(createButtonBox.height).toBeGreaterThanOrEqual(52);
+  expect(joinButtonBox.height).toBeGreaterThanOrEqual(52);
+  expect(Math.abs(createButtonBox.width - joinButtonBox.width)).toBeLessThanOrEqual(1);
+
   const health = await request.get("/api/health");
   expect(health.status()).toBe(200);
   await expect(health.json()).resolves.toEqual({ status: "ok" });

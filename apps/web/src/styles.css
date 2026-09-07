@@ -200,17 +200,22 @@ main:not(.table-page) {
 }
 
 .home-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(5rem, 13vw, 8.5rem);
-  align-items: start;
-  gap: clamp(1rem, 3vw, 2.5rem);
-  max-width: 58rem;
-  width: min(100%, 58rem);
+  max-width: 66rem;
+  width: min(100%, 66rem);
+}
+
+.home-intro {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2.5vw, 1.75rem);
+  padding-bottom: clamp(1.25rem, 3vw, 2rem);
+  border-bottom: 1px solid var(--border);
 }
 
 .home-hero-tile {
   display: grid;
-  width: 100%;
+  width: clamp(3.5rem, 7vw, 4.75rem);
+  flex: 0 0 clamp(3.5rem, 7vw, 4.75rem);
   aspect-ratio: 5 / 7;
   place-items: center;
   border-radius: 0.8rem;
@@ -225,39 +230,89 @@ main:not(.table-page) {
   filter: drop-shadow(0 0.8rem 0.55rem rgb(0 0 0 / 28%));
 }
 
-.home-content {
+.home-intro-copy {
   min-width: 0;
+}
+
+.home-intro h1 {
+  margin: 0.2rem 0 0.55rem;
+  font-size: clamp(2rem, 4.5vw, 3.25rem);
+}
+
+.home-intro-copy > p:last-child {
+  max-width: 46rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(0.98rem, 1.5vw, 1.1rem);
 }
 
 .home-lobby-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1rem, 3vw, 2rem);
-  margin-top: 1.6rem;
-  border-top: 1px solid var(--border);
+  margin-top: clamp(1.5rem, 3vw, 2.25rem);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
 }
 
 .home-lobby-action {
+  display: flex;
   min-width: 0;
-  padding-top: 1.15rem;
+  min-height: 18rem;
+  flex-direction: column;
+  padding: clamp(1.25rem, 3vw, 2rem);
 }
 
 .home-lobby-action + .home-lobby-action {
   border-left: 1px solid var(--border);
-  padding-left: clamp(1rem, 3vw, 2rem);
+}
+
+.home-action-kicker {
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 .home-lobby-action h2 {
-  margin: 0;
+  margin: 0.45rem 0 0;
   color: var(--text);
-  font-size: 1.02rem;
+  font-size: clamp(1.3rem, 2.3vw, 1.65rem);
+  line-height: 1.15;
 }
 
-.home-lobby-action > p {
-  margin: 0.35rem 0 0;
+.home-lobby-action > p:not(.home-action-kicker) {
+  max-width: 30ch;
+  margin: 0.55rem 0 0;
   color: var(--muted);
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.97rem;
+  line-height: 1.5;
+}
+
+.home-lobby-action .nickname-form,
+.home-lobby-action .lobby-code-form {
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 1.5rem;
+}
+
+.home-lobby-action input {
+  min-height: 3.25rem;
+  padding-inline: 0.9rem;
+  font-size: 1rem;
+}
+
+.home-lobby-action button {
+  width: 100%;
+  min-height: 3.25rem;
+  font-size: 1rem;
+}
+
+.home-card .house-rules-note {
+  margin: 1rem 0 0;
+  font-size: 0.86rem;
 }
 
 .nickname-form,
@@ -1371,24 +1426,38 @@ p {
   }
 
   .home-card {
-    display: block;
+    padding: clamp(1.25rem, 6vw, 1.75rem);
+  }
+
+  .home-intro {
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding-bottom: 1.25rem;
   }
 
   .home-hero-tile {
-    display: none;
+    width: 3.4rem;
+    flex-basis: 3.4rem;
+  }
+
+  .home-intro h1 {
+    font-size: clamp(1.75rem, 8vw, 2.3rem);
   }
 
   .home-lobby-options {
     grid-template-columns: 1fr;
-    gap: 0;
+    margin-top: 1.35rem;
+  }
+
+  .home-lobby-action {
+    min-height: 0;
+    padding: 1.25rem;
   }
 
   .home-lobby-action + .home-lobby-action {
-    margin-top: 1.15rem;
+    margin-top: 0;
     border-top: 1px solid var(--border);
     border-left: 0;
-    padding-top: 1.15rem;
-    padding-left: 0;
   }
 
   .lobby-heading {

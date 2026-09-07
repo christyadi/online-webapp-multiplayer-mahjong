@@ -296,6 +296,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 ## Latest landing and player-card feedback (2026-09-07)
 
+- Reworked the landing page as a compact table invitation after visual feedback that the decorative tile overwhelmed the small create/join forms. The tile is now a supporting title emblem; two equal entry lanes give creating and joining the room desktop-scale, full-width 52px controls. Browser coverage prevents the emblem from exceeding half either action's width and requires equal primary-action widths.
 - Replaced the inherited light landing-card fill with explicit dark-mode component colors, so its text, labels, and inputs retain a high-contrast surface in dark mode.
 - Added a first-viewport **Join a lobby** section. It accepts a case-insensitive 12-character private invite code, validates it locally, and routes into the existing private invitation/nickname flow without creating public matchmaking.
 - Recolored the four light-mode player cards as readable seat-tinted paper surfaces with explicit dark foreground and metadata colors. The browser regression calculates and requires a WCAG AA 4.5:1-or-greater text contrast ratio for a light player card and the dark landing card.
