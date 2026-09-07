@@ -10,7 +10,13 @@ const port = Number.parseInt(process.env.PORT ?? "3001", 10);
 const roomStore = new RoomStore();
 const sessionStore = new SessionStore();
 const stopRoomCleanup = roomStore.startCleanup();
-const httpServer = createServer(createApp({ roomStore, sessionStore }));
+const httpServer = createServer(
+  createApp({
+    roomStore,
+    sessionStore,
+    ...(process.env.PLAYWRIGHT_TEST === "true" ? { sessionCreationLimit: 120 } : {}),
+  }),
+);
 
 const realtimeServer = new Server(httpServer, {
   maxHttpBufferSize: 16 * 1024,

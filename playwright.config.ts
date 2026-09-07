@@ -24,6 +24,7 @@ export default defineConfig({
     env: {
       APP_ORIGIN: `http://127.0.0.1:${String(port)}`,
       NODE_ENV: "production",
+      PLAYWRIGHT_TEST: "true",
       PORT: String(port),
     },
     url: `http://127.0.0.1:${String(port)}/api/health`,

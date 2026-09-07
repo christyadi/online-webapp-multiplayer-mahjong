@@ -352,6 +352,23 @@ describe("guest and lobby HTTP API", () => {
     expect(limited.status).toBe(429);
     await expect(limited.json()).resolves.toMatchObject({ code: "rate-limit" });
   });
+
+  it("uses an injected unauthenticated session allocation limit", async () => {
+    const origin = "http://mahjong.test";
+    const baseUrl = await listen(createApp({ appOrigin: origin, sessionCreationLimit: 2 }));
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch(`${baseUrl}/api/session`, {
+        headers: { origin },
+        method: "POST",
+      });
+      expect(response.status).toBe(201);
+    }
+    const limited = await fetch(`${baseUrl}/api/session`, {
+      headers: { origin },
+      method: "POST",
+    });
+    expect(limited.status).toBe(429);
+  });
 });
 
 async function listen(app: ReturnType<typeof createApp>): Promise<string> {

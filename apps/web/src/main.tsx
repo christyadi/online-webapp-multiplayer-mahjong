@@ -13,7 +13,6 @@ import {
   type GameSnapshot,
   type RoomInvitation,
   type RoomView,
-  type TileType,
 } from "@mahjong-together/shared";
 import {
   StrictMode,
@@ -944,7 +943,7 @@ function Table({
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [touchReorderSourceId, setTouchReorderSourceId] = useState<string | null>(null);
-  const [showOpponentTiles, setShowOpponentTiles] = useState(false);
+  const [opponentTilesHandId, setOpponentTilesHandId] = useState<string | null>(null);
   const [closedResultHandId, setClosedResultHandId] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [showTableMenu, setShowTableMenu] = useState(false);
@@ -1082,10 +1081,6 @@ function Table({
       previousGame.current = game;
     }
   }, [game]);
-
-  useEffect(() => {
-    setShowOpponentTiles(false);
-  }, [game.handId]);
 
   if (viewer === undefined)
     return <StatusCard message="Your seat is unavailable." title="Table error" />;
@@ -1302,7 +1297,7 @@ function Table({
             game={game}
             onClose={() => setClosedResultHandId(game.handId)}
             onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
-            onShowOpponentTiles={() => setShowOpponentTiles(true)}
+            onShowOpponentTiles={() => setOpponentTilesHandId(game.handId)}
             onPlayAgain={startNextHand}
             pending={pending}
             rematchSeconds={rematchSeconds}
@@ -1329,8 +1324,8 @@ function Table({
             }}
           />
         ) : null}
-        {showOpponentTiles ? (
-          <OpponentHandsDialog game={game} onClose={() => setShowOpponentTiles(false)} />
+        {opponentTilesHandId === game.handId ? (
+          <OpponentHandsDialog game={game} onClose={() => setOpponentTilesHandId(null)} />
         ) : null}
         {error === null ? null : (
           <p className="error" role="alert">
@@ -1434,10 +1429,10 @@ function playerStatus(
 }
 
 function DiscardPool({ game }: Readonly<{ game: GameSnapshot }>) {
-  const discards = game.discardPool.map(({ seat, tile }) => ({
-    player: game.players[seat]!,
-    tile,
-  }));
+  const discards = game.discardPool.flatMap(({ seat, tile }) => {
+    const player = game.players[seat];
+    return player === undefined ? [] : [{ player, tile }];
+  });
   return (
     <div className="discard-pool" aria-label="All discarded tiles">
       <div className="discard-pool-heading">
@@ -1699,9 +1694,8 @@ function publicActionSince(previous: GameSnapshot, game: GameSnapshot): string |
       previous.players.find((candidate) => candidate.seat === player.seat)?.melds ?? [];
     const changedMeld = player.melds.find(
       (meld, index) =>
-        previousMelds[index] === undefined ||
-        previousMelds[index].kind !== meld.kind ||
-        previousMelds[index].tileCount !== meld.tileCount,
+        previousMelds[index]?.kind !== meld.kind ||
+        previousMelds[index]?.tileCount !== meld.tileCount,
     );
     if (changedMeld !== undefined) return meldActionLabel(game, player.seat, changedMeld.kind);
   }

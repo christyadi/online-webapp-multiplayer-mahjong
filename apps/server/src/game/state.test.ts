@@ -257,11 +257,9 @@ describe("pure hand state machine", () => {
   it("keeps remaining discards in the order they were played", () => {
     const state = makeDiscardState({}, 0);
     const first = state.players[0].concealed[0];
-    if (first === undefined) throw new Error("Expected an opening discard");
     let next = finishDiscardClaims(accept(transition(state, 0, discardAction(state, first.id))));
     if (next.phase !== "awaiting-discard") throw new Error("Expected the next discard turn");
     const second = next.players[next.turn].concealed[0];
-    if (second === undefined) throw new Error("Expected a second discard");
     next = accept(transition(next, next.turn, discardAction(next, second.id)));
 
     expect(next.discardOrder).toEqual([first.id, second.id]);

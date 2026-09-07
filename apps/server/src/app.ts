@@ -32,6 +32,7 @@ export type AppOptions = Readonly<{
   appOrigin?: string;
   roomStore?: RoomStore;
   secureCookies?: boolean;
+  sessionCreationLimit?: number;
   sessionStore?: SessionStore;
 }>;
 
@@ -44,6 +45,7 @@ export function createApp(options: AppOptions = {}) {
   const lobbyCommands = new SessionCommandReplay<HttpOutcome>();
   const roomAttemptLimiter = new SlidingWindowRateLimiter();
   const sessionCreationLimiter = new SlidingWindowRateLimiter();
+  const sessionCreationLimit = options.sessionCreationLimit ?? 30;
 
   app.disable("x-powered-by");
   if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
@@ -79,7 +81,7 @@ export function createApp(options: AppOptions = {}) {
       const presentedToken = readGuestToken(request);
       if (
         sessionStore.find(presentedToken) === null &&
-        !sessionCreationLimiter.consume(clientAddress(request), 30, 60_000)
+        !sessionCreationLimiter.consume(clientAddress(request), sessionCreationLimit, 60_000)
       ) {
         sendError(response, 429, "rate-limit", "Too many guest sessions from this address");
         return;
