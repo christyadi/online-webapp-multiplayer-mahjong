@@ -80,7 +80,7 @@ Set a goal to build, test, and publicly deploy the Mahjong Together web game des
 - Use deterministic local heuristics, not an LLM or paid service. Feed bots exactly the own-hand/public-table information a human seat receives; bots must not inspect other hands or future draws.
 - Always claim a legal win. For version one, pass all chow/pung/kong opportunities and never initiate a kong. Bots can win by normal draws or discard claims and remain legal, intentionally basic opponents.
 - For discarding, compute a keep score per tile type: +6 if there are at least three copies in hand, otherwise +4 for a pair; for suited tiles add +2 for each distinct same-suit rank one away present and +1 for each rank two away present. Discard the tile with the lowest keep score. Break ties by tile-type order (dots, bamboo, characters, winds E/S/W/N, dragons red/green/white), then physical tile ID. Recompute after every draw.
-- Bots act after 700 ms in the normal game. Inject a scheduler in tests so simulation needs no real-time delays. Bot actions must use the same validated transitions as human actions.
+- Bots act after a cryptographically random 1–5 second cooldown in the normal game. Inject a scheduler in tests so simulation needs no real-time delays. Bot actions must use the same validated transitions as human actions.
 
 ### Execution guidelines
 
