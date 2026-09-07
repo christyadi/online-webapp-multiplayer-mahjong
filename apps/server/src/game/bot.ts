@@ -77,7 +77,7 @@ function chooseDiscard(
   // Under real pressure, restrict to tiles we know are safe against a threatening
   // opponent (genbutsu: already discarded by them, or already called by anyone).
   const pool =
-    threatLevel === "high" ? preferSafeTiles(candidates, view) ?? candidates : candidates;
+    threatLevel === "high" ? (preferSafeTiles(candidates, view) ?? candidates) : candidates;
 
   let best: { tile: PhysicalTile; shanten: number; ukeireCount: number } | null = null;
   for (const tile of pool) {

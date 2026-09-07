@@ -247,7 +247,7 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 ## Final verification after stabilization
 
-- `npm run format`, `npm run lint`, strict `npm run typecheck`, production `npm run build`, and `npm test` pass; Vitest reports 13 files and 89 tests.
+- `npm run format`, `npm run lint`, strict `npm run typecheck`, production `npm run build`, and `npm test` pass; Vitest reports 13 files and 93 tests.
 - Chromium desktop passes all eight standard page/lobby flows. Chromium phone portrait and landscape pass all sixteen standard flows across the exact required viewports. iPad Pro 11 Chromium passes all eight standard flows.
 - WebKit passes all eight standard flows. Its isolated-guest multi-context test receives a documented 60-second allowance for the Windows WebKit engine and completed in 29 seconds; native drag is still asserted in Chromium, while WebKit verifies the keyboard/click interaction path.
 - Isolated Chromium flows pass for Chow claims, added-Kong upgrade, winning decomposition, opt-out/manual rematch, and default 15-second auto-rematch. Firefox was not installed or run, as requested.
@@ -331,3 +331,11 @@ Complete remaining visual-direction work and the final stabilization audit. Publ
 - Private invitations now fetch a deliberately minimal availability response and show **First available** plus only the open East, South, West, and North seat choices. Seat claims are server-validated; a simultaneous stale choice is rejected without creating a membership. A full room keeps the join form locked with a clear message.
 - Added two-human Chromium result coverage for host loss: the remaining human becomes host, no rematch begins in the first 14 seconds, the enabled auto-play starts exactly one rematch after the 15-second countdown, and the dealer rotates to South.
 - Verification: targeted RoomStore tests (17), the seven Chromium lobby flows, and the three Chromium result flows pass. Firefox remains deferred at the user’s direction.
+
+## Quality-gate stabilization completed (2026-09-07)
+
+- Restored global Prettier and ESLint compliance without altering shanten or bot behavior. Indexed shanten counts now use explicit checked assignments, and the deterministic bot simulation narrows its claim-discard state before reading it.
+- Replaced result-dialog effect synchronization with hand-ID-derived visibility. Closing one completed result does not suppress a later completed hand; **View result** still reopens the same hand.
+- Added an isolated, test-only result-lifecycle fixture on a separate port. It is excluded from normal browser projects, runs only through `test:e2e:results`, and proves the closed prior dialog reopens when the 15-second auto-rematch produces a new completed hand.
+- Independent review found and corrected three material test gaps: missing lifecycle coverage, a random-bot timing path, and fixture leakage into the normal E2E matrix. The final identified closed-state branch was corrected and verified by the deterministic lifecycle flow. No game-rule, privacy, or production-fixture leakage was found.
+- Verification: Prettier, ESLint, strict typecheck, production build, and all 13 Vitest files / 93 tests pass. Standard Chromium (9), normal results Chromium (3), and lifecycle results Chromium (1) pass. Firefox and public deployment remain deferred at the user’s direction.

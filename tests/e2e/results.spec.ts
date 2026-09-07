@@ -6,6 +6,10 @@ test("a host can start the next hand from the completed result dialog", async ({
   const resultDialog = page.getByRole("dialog", { name: "Draw hand" });
   await expect(resultDialog).toBeVisible();
   await expect(page.getByRole("button", { name: "Return to lobby" })).toHaveCount(0);
+  await resultDialog.getByRole("button", { name: "Close Draw hand" }).click();
+  await expect(resultDialog).toHaveCount(0);
+  await page.getByRole("button", { name: "View result" }).click();
+  await expect(resultDialog).toBeVisible();
   await resultDialog.getByRole("button", { name: "Show other hands" }).click();
   await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toBeVisible();
   await expect(

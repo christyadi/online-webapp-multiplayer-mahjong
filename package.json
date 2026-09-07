@@ -21,7 +21,7 @@
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:claims": "playwright test -c playwright.claims.config.ts",
     "test:e2e:kongs": "playwright test -c playwright.kongs.config.ts",
-    "test:e2e:results": "playwright test -c playwright.results.config.ts",
+    "test:e2e:results": "playwright test -c playwright.results.config.ts && playwright test -c playwright.results-lifecycle.config.ts",
     "test:e2e:wins": "playwright test -c playwright.wins.config.ts",
     "test:e2e:phone": "playwright test --project=phone-portrait --project=phone-landscape",
     "test:e2e:tablet": "playwright test --project=tablet-chromium",

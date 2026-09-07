@@ -928,7 +928,7 @@ function Table({
   const [tileOrder, setTileOrder] = useState<string[]>([]);
   const [touchReorderSourceId, setTouchReorderSourceId] = useState<string | null>(null);
   const [showOpponentTiles, setShowOpponentTiles] = useState(false);
-  const [showResult, setShowResult] = useState(() => game.result !== null);
+  const [closedResultHandId, setClosedResultHandId] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [autoPlayAgain, setAutoPlayAgain] = useState(true);
   const [autoPlaySeconds, setAutoPlaySeconds] = useState<number | null>(null);
@@ -938,7 +938,6 @@ function Table({
   const autoPlayTimeoutRef = useRef<number | null>(null);
   const playAgainRef = useRef(onPlayAgain);
   const previousGame = useRef(game);
-  const displayedResultHandId = useRef<string | null>(game.result === null ? null : game.handId);
   const touchTilePress = useRef<{
     activated: boolean;
     pointerId: number;
@@ -1058,18 +1057,6 @@ function Table({
   }, [game.deadline, game.rematchDeadline]);
 
   useEffect(() => {
-    if (game.result === null) {
-      displayedResultHandId.current = null;
-      setShowResult(false);
-      return;
-    }
-    if (displayedResultHandId.current !== game.handId) {
-      displayedResultHandId.current = game.handId;
-      setShowResult(true);
-    }
-  }, [game.handId, game.result]);
-
-  useEffect(() => {
     const previous = previousGame.current;
     if (previous.roomRevision !== game.roomRevision || previous.handId !== game.handId) {
       const nextAction = publicActionSince(previous, game);
@@ -1080,6 +1067,8 @@ function Table({
 
   if (viewer === undefined)
     return <StatusCard message="Your seat is unavailable." title="Table error" />;
+
+  const showResult = game.result !== null && closedResultHandId !== game.handId;
 
   const send = (action: GameCommand["action"]) => {
     if (realtime === null || !realtime.connected || game.decisionId === null || commandPending)
@@ -1143,7 +1132,7 @@ function Table({
               <button
                 aria-controls="hand-result"
                 className="table-result-trigger"
-                onClick={() => setShowResult(true)}
+                onClick={() => setClosedResultHandId(null)}
                 type="button"
               >
                 View result
@@ -1283,7 +1272,7 @@ function Table({
             autoPlaySeconds={autoPlaySeconds}
             canPlayAgain={canPlayAgain}
             game={game}
-            onClose={() => setShowResult(false)}
+            onClose={() => setClosedResultHandId(game.handId)}
             onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
             onShowOpponentTiles={() => setShowOpponentTiles(true)}
             onPlayAgain={startNextHand}

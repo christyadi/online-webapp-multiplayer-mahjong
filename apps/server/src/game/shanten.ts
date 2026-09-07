@@ -5,7 +5,10 @@ type BlockSearchResult = Readonly<{ sets: number; partials: number }>;
 
 function countTileTypes(tiles: readonly PhysicalTile[]): number[] {
   const counts = Array.from({ length: TILE_TYPES.length }, () => 0);
-  for (const tile of tiles) counts[tileTypeIndex(tile.type)]! += 1;
+  for (const tile of tiles) {
+    const index = tileTypeIndex(tile.type);
+    counts[index] = (counts[index] ?? 0) + 1;
+  }
   return counts;
 }
 
@@ -34,7 +37,7 @@ function bestBlocks(
   // Treat this type as unused (floater) and move on.
   {
     const skipped = counts.slice();
-    skipped[firstIndex]! = 0;
+    skipped[firstIndex] = 0;
     consider(bestBlocks(skipped, needSets, memo));
   }
 
@@ -42,13 +45,13 @@ function bestBlocks(
 
   if (count >= 3) {
     const next = counts.slice();
-    next[firstIndex]! -= 3;
+    next[firstIndex] = (next[firstIndex] ?? 0) - 3;
     const rest = bestBlocks(next, needSets, memo);
     consider({ sets: rest.sets + 1, partials: rest.partials });
   }
   if (count >= 2) {
     const next = counts.slice();
-    next[firstIndex]! -= 2;
+    next[firstIndex] = (next[firstIndex] ?? 0) - 2;
     const rest = bestBlocks(next, needSets, memo);
     consider({ sets: rest.sets, partials: rest.partials + 1 });
   }
@@ -62,23 +65,23 @@ function bestBlocks(
     (counts[firstIndex + 2] ?? 0) > 0
   ) {
     const next = counts.slice();
-    next[firstIndex]! -= 1;
-    next[firstIndex + 1]! -= 1;
-    next[firstIndex + 2]! -= 1;
+    next[firstIndex] = (next[firstIndex] ?? 0) - 1;
+    next[firstIndex + 1] = (next[firstIndex + 1] ?? 0) - 1;
+    next[firstIndex + 2] = (next[firstIndex + 2] ?? 0) - 1;
     const rest = bestBlocks(next, needSets, memo);
     consider({ sets: rest.sets + 1, partials: rest.partials });
   }
   if (isSuited && rankOffset <= 6 && (counts[firstIndex + 2] ?? 0) > 0) {
     const next = counts.slice(); // kanchan: X _ X
-    next[firstIndex]! -= 1;
-    next[firstIndex + 2]! -= 1;
+    next[firstIndex] = (next[firstIndex] ?? 0) - 1;
+    next[firstIndex + 2] = (next[firstIndex + 2] ?? 0) - 1;
     const rest = bestBlocks(next, needSets, memo);
     consider({ sets: rest.sets, partials: rest.partials + 1 });
   }
   if (isSuited && rankOffset <= 7 && (counts[firstIndex + 1] ?? 0) > 0) {
     const next = counts.slice(); // ryanmen/penchan: X X
-    next[firstIndex]! -= 1;
-    next[firstIndex + 1]! -= 1;
+    next[firstIndex] = (next[firstIndex] ?? 0) - 1;
+    next[firstIndex + 1] = (next[firstIndex + 1] ?? 0) - 1;
     const rest = bestBlocks(next, needSets, memo);
     consider({ sets: rest.sets, partials: rest.partials + 1 });
   }
@@ -106,7 +109,7 @@ export function standardShanten(
   for (let index = 0; index < counts.length; index += 1) {
     if ((counts[index] ?? 0) < 2) continue;
     const withoutPair = counts.slice();
-    withoutPair[index]! -= 2;
+    withoutPair[index] = (withoutPair[index] ?? 0) - 2;
     evaluate(withoutPair, true);
   }
   return best;

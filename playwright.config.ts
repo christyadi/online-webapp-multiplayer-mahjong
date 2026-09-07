@@ -4,7 +4,13 @@ const port = 4173;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: ["results.spec.ts", "claims.spec.ts", "wins.spec.ts", "kongs.spec.ts"],
+  testIgnore: [
+    "results.spec.ts",
+    "results-lifecycle.spec.ts",
+    "claims.spec.ts",
+    "wins.spec.ts",
+    "kongs.spec.ts",
+  ],
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,

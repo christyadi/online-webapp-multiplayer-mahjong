@@ -44,5 +44,7 @@ httpServer.on("close", () => {
 function nextTestHand(dealer: SeatIndex): HandState {
   startedHands += 1;
   const hand = startHand(randomUUID(), dealer, shuffleTiles(createTileSet()));
-  return startedHands % 2 === 1 ? { ...hand, phase: "hand-ended", result: { kind: "draw" } } : hand;
+  const completeImmediately =
+    process.env.RESULTS_LIFECYCLE_FIXTURE === "true" || startedHands % 2 === 1;
+  return completeImmediately ? { ...hand, phase: "hand-ended", result: { kind: "draw" } } : hand;
 }
