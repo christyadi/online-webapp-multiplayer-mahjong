@@ -1332,12 +1332,23 @@ a {
 
 .seat {
   display: grid;
-  grid-template-columns: 5rem 1fr;
+  grid-template-columns: 5rem 1fr auto;
   gap: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
   padding: 0.85rem;
   background: var(--surface-alt);
+}
+
+.seat-move {
+  align-self: center;
+  justify-self: end;
+  padding: 0.55rem 0.8rem;
+}
+
+.seat-current {
+  color: var(--primary-hover);
+  font-weight: 650;
 }
 
 .lobby-actions {
@@ -1488,6 +1499,11 @@ p {
   .seat {
     grid-template-columns: 1fr;
     gap: 0.2rem;
+  }
+
+  .seat-move {
+    justify-self: start;
+    margin-top: 0.35rem;
   }
 
   .table-header {

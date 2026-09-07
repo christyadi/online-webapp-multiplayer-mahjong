@@ -1,6 +1,7 @@
 import {
   createRoomRequestSchema,
   joinRoomRequestSchema,
+  moveSeatRequestSchema,
   roomMutationSchema,
   setReadyRequestSchema,
   type ApiError,
@@ -183,6 +184,28 @@ export function createApp(options: AppOptions = {}) {
       () => undefined,
       () => {
         const room = roomStore.setReady(session, request.params.code, input.data.ready);
+        return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
+      },
+    );
+  });
+  app.post("/api/rooms/:code/seat", (request, response) => {
+    const session = requireSession(request, response, sessionStore);
+    if (session === null) return;
+    if (!requireActiveController(request, response, sessionStore, session)) return;
+    const input = moveSeatRequestSchema.safeParse(request.body);
+    if (!input.success) {
+      sendError(response, 400, "invalid-request", "Seat selection was not understood");
+      return;
+    }
+    runRoomMutation(
+      response,
+      lobbyCommands,
+      session,
+      input.data.commandId,
+      { code: request.params.code, input: input.data, operation: "move-seat" },
+      () => undefined,
+      () => {
+        const room = roomStore.moveSeat(session, request.params.code, input.data.seat);
         return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
       },
     );

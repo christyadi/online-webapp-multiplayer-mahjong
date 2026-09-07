@@ -205,6 +205,28 @@ export class RoomStore {
     return viewFor(room, session.guestId);
   }
 
+  moveSeat(session: GuestSession, code: string, targetSeat: number): RoomView {
+    this.cleanupExpired();
+    const { room, seat, seatIndex } = this.requireHumanMembership(session.guestId, code);
+    if (room.phase !== "lobby") throw new RoomError("room-active", "The hand has started");
+    if (!Number.isInteger(targetSeat) || targetSeat < 0 || targetSeat > 3) {
+      throw new RoomError("seat-unavailable", "That seat is no longer available");
+    }
+    const targetSeatIndex = targetSeat as SeatIndex;
+    if (targetSeatIndex === seatIndex) return viewFor(room, session.guestId);
+    if (room.seats[targetSeatIndex] !== null) {
+      throw new RoomError("seat-unavailable", "That seat is no longer available");
+    }
+
+    room.seats[seatIndex] = null;
+    room.seats[targetSeatIndex] = seat;
+    seat.ready = false;
+    room.lastActivityAt = this.#clock();
+    room.roomRevision += 1;
+    this.notify(code);
+    return viewFor(room, session.guestId);
+  }
+
   start(session: GuestSession, code: string): RoomView {
     this.cleanupExpired();
     const { room, seat } = this.requireHumanMembership(session.guestId, code);

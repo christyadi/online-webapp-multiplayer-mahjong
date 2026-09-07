@@ -340,4 +340,11 @@ Complete remaining visual-direction work and the final stabilization audit. Publ
 - Restored the specified basic bot policy after an audit found unrequested shanten, threat, and meld-claim behavior. Bots now take every legal win, pass every non-winning Chow/Pung/Kong opportunity, never initiate a Kong, and discard using the documented keep score with stable tile-type and physical-ID ties.
 - Added an isolated, test-only result-lifecycle fixture on a separate port. It is excluded from normal browser projects, runs only through `test:e2e:results`, and proves the closed prior dialog reopens when the 15-second auto-rematch produces a new completed hand.
 - Independent review found and corrected three material test gaps: missing lifecycle coverage, a random-bot timing path, and fixture leakage into the normal E2E matrix. The final identified closed-state branch was corrected and verified by the deterministic lifecycle flow. No game-rule, privacy, or production-fixture leakage was found.
-- Verification: Prettier, ESLint, strict typecheck, production build, and all 13 Vitest files / 93 tests pass. Standard Chromium (9), normal results Chromium (3), and lifecycle results Chromium (1) pass. Firefox and public deployment remain deferred at the user’s direction.
+- Verification: Prettier, ESLint, strict typecheck, production build, and all 13 Vitest files / 95 tests pass. Standard Chromium (9), normal results Chromium (3), and lifecycle results Chromium (1) pass. Firefox and public deployment remain deferred at the user’s direction.
+
+## Lobby seat movement feedback completed (2026-09-07)
+
+- Added a visible **Move here** action to every vacant seat in the in-room lobby. The current seat is labeled **You are sitting here**, so a player can enter a nickname, join, and reposition themselves without leaving the room.
+- Added `POST /api/rooms/:code/seat` with strict command replay, session/controller authorization, atomic open-seat validation, lobby-only enforcement, and readiness reset after movement. Occupied, malformed, and active-hand targets leave membership unchanged.
+- Verification: the targeted RoomStore suite (18 tests), targeted Chromium seat-movement flow, Prettier, ESLint, and strict typecheck pass. Firefox remains deferred at the user’s direction.
+- Follow-up browser evidence: the previously failing WebKit smoke run now passes 9/9 tests in 28 seconds; standard Chromium passes 10/10 tests after the lobby movement change.

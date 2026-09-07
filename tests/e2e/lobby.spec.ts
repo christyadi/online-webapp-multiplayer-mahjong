@@ -262,6 +262,26 @@ test("ready players can start a hand with bots in empty seats", async ({ browser
   }
 });
 
+test("a lobby player can move to an open seat after entering a nickname", async ({ page }) => {
+  await page.goto("/");
+  await createRoom(page, "Host");
+
+  await page.getByRole("button", { name: "I’m ready" }).click();
+  await expect(page.getByRole("button", { name: "Mark not ready" })).toBeVisible();
+
+  const southSeat = page.locator(".seat").filter({ hasText: "South" });
+  await southSeat.getByRole("button", { name: "Move to South" }).click();
+  await expect(page.getByText("You are South")).toBeVisible();
+  await expect(page.getByRole("button", { name: "I’m ready" })).toBeVisible();
+  await expect(southSeat.getByText("You are sitting here")).toBeVisible();
+
+  const eastSeat = page.locator(".seat").filter({ hasText: "East" });
+  await eastSeat.getByRole("button", { name: "Move to East" }).click();
+  await expect(page.getByText("You are East")).toBeVisible();
+  await expect(eastSeat.getByText("You are sitting here")).toBeVisible();
+  await expect(southSeat.getByText("Open — bot joins at start")).toBeVisible();
+});
+
 test("leaving an active hand releases the guest for a new room", async ({ page }) => {
   await page.goto("/");
   await createRoom(page, "Host");

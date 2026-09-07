@@ -141,6 +141,79 @@ describe("guest and lobby HTTP API", () => {
     await expect(intruder.json()).resolves.toMatchObject({ code: "not-in-room" });
   });
 
+  it("moves seats through the HTTP API with controller, replay, and race protection", async () => {
+    const origin = "http://mahjong.test";
+    const roomStore = new RoomStore({ codeFactory: () => "seathttp0001" });
+    const sessionStore = new SessionStore();
+    const baseUrl = await listen(createApp({ appOrigin: origin, roomStore, sessionStore }));
+    const [host, friend] = await Promise.all(
+      [0, 1].map(() => establishSession(baseUrl, origin, sessionStore)),
+    );
+    const created = await postJson(baseUrl, origin, host, "/api/rooms", {
+      commandId: randomUUID(),
+      nickname: "Host",
+    });
+    expect(created.status).toBe(201);
+    const room = (await created.json()) as { roomCode: string };
+    const joined = await postJson(baseUrl, origin, friend, `/api/rooms/${room.roomCode}/join`, {
+      commandId: randomUUID(),
+      nickname: "Friend",
+      seat: 1,
+    });
+    expect(joined.status).toBe(200);
+
+    const malformed = await postJson(baseUrl, origin, host, `/api/rooms/${room.roomCode}/seat`, {
+      commandId: randomUUID(),
+    });
+    expect(malformed.status).toBe(400);
+
+    const replacedController = await postJson(
+      baseUrl,
+      origin,
+      { ...host, controllerId: randomUUID() },
+      `/api/rooms/${room.roomCode}/seat`,
+      { commandId: randomUUID(), seat: 2 },
+    );
+    expect(replacedController.status).toBe(409);
+    await expect(replacedController.json()).resolves.toMatchObject({
+      code: "controller-replaced",
+    });
+
+    const hostCommand = { commandId: randomUUID(), seat: 2 };
+    const friendCommand = { commandId: randomUUID(), seat: 2 };
+    const [hostMove, friendMove] = await Promise.all([
+      postJson(baseUrl, origin, host, `/api/rooms/${room.roomCode}/seat`, hostCommand),
+      postJson(baseUrl, origin, friend, `/api/rooms/${room.roomCode}/seat`, friendCommand),
+    ]);
+    expect([hostMove.status, friendMove.status].sort()).toEqual([200, 409]);
+
+    const winner = hostMove.status === 200 ? host : friend;
+    const winnerCommand = hostMove.status === 200 ? hostCommand : friendCommand;
+    const winnerReplay = await postJson(
+      baseUrl,
+      origin,
+      winner,
+      `/api/rooms/${room.roomCode}/seat`,
+      winnerCommand,
+    );
+    expect(winnerReplay.status).toBe(200);
+    await expect(winnerReplay.json()).resolves.toEqual(
+      await (hostMove.status === 200 ? hostMove : friendMove).json(),
+    );
+
+    const loser = hostMove.status === 200 ? friend : host;
+    const loserResponse = hostMove.status === 200 ? friendMove : hostMove;
+    const loserReplay = await postJson(
+      baseUrl,
+      origin,
+      loser,
+      `/api/rooms/${room.roomCode}/seat`,
+      hostMove.status === 200 ? friendCommand : hostCommand,
+    );
+    expect(loserReplay.status).toBe(409);
+    await expect(loserReplay.json()).resolves.toEqual(await loserResponse.json());
+  });
+
   it("rejects mutation requests outside the configured application origin", async () => {
     const baseUrl = await listen(createApp({ appOrigin: "https://allowed.example" }));
     const response = await fetch(`${baseUrl}/api/session`, {

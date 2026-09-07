@@ -28,6 +28,12 @@ export const setReadyRequestSchema = roomMutationSchema
   })
   .strict();
 
+export const moveSeatRequestSchema = roomMutationSchema
+  .extend({
+    seat: seatIndexSchema,
+  })
+  .strict();
+
 export const lobbyOccupantSchema = z.discriminatedUnion("kind", [
   z.object({
     connected: z.boolean(),
@@ -77,6 +83,7 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 export type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;
 export type JoinRoomRequest = z.infer<typeof joinRoomRequestSchema>;
 export type LobbyMutationAcknowledgement = z.infer<typeof lobbyMutationAcknowledgementSchema>;
+export type MoveSeatRequest = z.infer<typeof moveSeatRequestSchema>;
 export type RoomInvitation = z.infer<typeof roomInvitationSchema>;
 export type RoomView = z.infer<typeof roomViewSchema>;
 export type SessionView = z.infer<typeof sessionViewSchema>;

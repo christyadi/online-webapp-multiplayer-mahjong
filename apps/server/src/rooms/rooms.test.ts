@@ -50,6 +50,30 @@ describe("room lobby", () => {
     expect(store.join(guest(3), room.code, "First free").viewerSeat).toBe(1);
   });
 
+  it("moves a lobby member into an open seat and resets readiness", () => {
+    const store = new RoomStore({ codeFactory: () => "seatmove0001" });
+    const room = store.create(guest(1), "Host");
+    store.setReady(guest(1), room.code, true);
+    store.join(guest(2), room.code, "Friend", 1);
+
+    const moved = store.moveSeat(guest(1), room.code, 2);
+    expect(moved).toMatchObject({ viewerReady: false, viewerSeat: 2 });
+    expect(moved.seats[0]).toBeNull();
+    expect(moved.seats[2]).toMatchObject({ host: true, nickname: "Host" });
+
+    expect(() => store.moveSeat(guest(1), room.code, 1)).toThrow(
+      expect.objectContaining({ code: "seat-unavailable" }),
+    );
+    expect(store.getCurrent(guest(1))).toMatchObject({ viewerSeat: 2 });
+
+    store.setReady(guest(1), room.code, true);
+    store.setReady(guest(2), room.code, true);
+    store.start(guest(1), room.code);
+    expect(() => store.moveSeat(guest(1), room.code, 3)).toThrow(
+      expect.objectContaining({ code: "room-active" }),
+    );
+  });
+
   it("requires the host and every connected human to be ready, then fills bots", () => {
     const store = new RoomStore({ codeFactory: () => "roomcode0002" });
     const room = store.create(guest(1), "Host");

@@ -84,6 +84,7 @@ The attached HTML concepts and design-system note are recorded in [DESIGN.md](./
 - [x] Add a landing-page **Join a lobby** section that validates a 12-character invite code and opens the existing private invitation flow.
 - [x] Add browser checks for dark landing and light player-card contrast, private lobby-code entry, bot icons, removed ordering chrome, and touch hold-then-tap ordering.
 - [x] Resolve the corrected review’s phone-scroll finding. The re-review found no unresolved critical, high, or medium issue in the landing, player-card, or revised ordering changes.
+- [x] Let a player who has entered a nickname move their own membership between open seats directly from the lobby, reset readiness after movement, and reject occupied or active-hand targets without changing membership.
 
 ## Room lifecycle and result-dialog feedback (2026-09-07)
 

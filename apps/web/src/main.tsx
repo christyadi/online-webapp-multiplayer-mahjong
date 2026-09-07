@@ -797,15 +797,32 @@ function Lobby({
             <li className="seat" key={SEAT_NAMES[index]}>
               <span className="seat-name">{SEAT_NAMES[index]}</span>
               {occupant === null ? (
-                <span className="seat-detail">Open — bot joins at start</span>
+                <>
+                  <span className="seat-detail">Open — bot joins at start</span>
+                  {room.phase === "lobby" ? (
+                    <button
+                      className="secondary seat-move"
+                      disabled={pending}
+                      onClick={() => void mutate(`/api/rooms/${room.code}/seat`, { seat: index })}
+                      type="button"
+                    >
+                      Move to {SEAT_NAMES[index]}
+                    </button>
+                  ) : null}
+                </>
               ) : occupant.kind === "bot" ? (
                 <span className="seat-detail">Bot</span>
               ) : (
-                <span className="seat-detail">
-                  {occupant.nickname}
-                  {occupant.host ? " · Host" : ""}
-                  {occupant.ready ? " · Ready" : " · Not ready"}
-                </span>
+                <>
+                  <span className="seat-detail">
+                    {occupant.nickname}
+                    {occupant.host ? " · Host" : ""}
+                    {occupant.ready ? " · Ready" : " · Not ready"}
+                  </span>
+                  {index === room.viewerSeat ? (
+                    <span className="seat-detail seat-current">You are sitting here</span>
+                  ) : null}
+                </>
               )}
             </li>
           ))}
