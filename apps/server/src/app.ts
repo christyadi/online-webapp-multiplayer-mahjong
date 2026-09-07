@@ -108,6 +108,11 @@ export function createApp(options: AppOptions = {}) {
     if (session === null) return;
     runRoomAction(response, () => roomStore.getForGuest(session, request.params.code));
   });
+  app.get("/api/rooms/:code/invitation", (request, response) => {
+    const session = requireSession(request, response, sessionStore);
+    if (session === null) return;
+    runRoomAction(response, () => roomStore.getInvitation(request.params.code));
+  });
   app.post("/api/rooms", (request, response) => {
     const session = requireSession(request, response, sessionStore);
     if (session === null) return;
@@ -150,7 +155,12 @@ export function createApp(options: AppOptions = {}) {
       { code: request.params.code, input: input.data, operation: "join-room" },
       () => requireRoomAttempt(roomAttemptLimiter, session.guestId),
       () => {
-        const room = roomStore.join(session, request.params.code, input.data.nickname);
+        const room = roomStore.join(
+          session,
+          request.params.code,
+          input.data.nickname,
+          input.data.seat,
+        );
         return { commandId: input.data.commandId, ok: true as const, roomCode: room.code };
       },
     );

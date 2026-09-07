@@ -323,6 +323,37 @@ main:not(.table-page) {
   margin-top: 1.5rem;
 }
 
+.seat-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+}
+
+.seat-picker legend {
+  padding-inline: 0.25rem;
+  font-weight: 750;
+}
+
+.seat-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  background: var(--surface-alt);
+  font-weight: 650;
+}
+
+.seat-choice input {
+  width: 1rem;
+  min-height: 1rem;
+}
+
 .nickname-form label,
 .lobby-code-form label,
 .seat-name {

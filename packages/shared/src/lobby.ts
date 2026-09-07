@@ -10,13 +10,17 @@ export const roomMutationSchema = z.strictObject({
   commandId: z.uuid(),
 });
 
+export const seatIndexSchema = z.number().int().min(0).max(3);
+
 export const createRoomRequestSchema = roomMutationSchema
   .extend({
     nickname: nicknameSchema,
   })
   .strict();
 
-export const joinRoomRequestSchema = createRoomRequestSchema;
+export const joinRoomRequestSchema = createRoomRequestSchema
+  .extend({ seat: seatIndexSchema.optional() })
+  .strict();
 
 export const setReadyRequestSchema = roomMutationSchema
   .extend({
@@ -45,6 +49,11 @@ export const roomViewSchema = z.object({
   viewerSeat: z.number().int().min(0).max(3),
 });
 
+export const roomInvitationSchema = z.object({
+  availableSeats: z.array(seatIndexSchema),
+  code: roomCodeSchema,
+});
+
 export const sessionViewSchema = z.object({
   expiresAt: z.number().int().positive(),
 });
@@ -68,6 +77,7 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 export type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;
 export type JoinRoomRequest = z.infer<typeof joinRoomRequestSchema>;
 export type LobbyMutationAcknowledgement = z.infer<typeof lobbyMutationAcknowledgementSchema>;
+export type RoomInvitation = z.infer<typeof roomInvitationSchema>;
 export type RoomView = z.infer<typeof roomViewSchema>;
 export type SessionView = z.infer<typeof sessionViewSchema>;
 export type SetReadyRequest = z.infer<typeof setReadyRequestSchema>;

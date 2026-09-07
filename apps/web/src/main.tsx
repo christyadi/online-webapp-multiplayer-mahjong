@@ -5,11 +5,13 @@ import {
   gameSnapshotSchema,
   lobbyMutationAcknowledgementSchema,
   roomCodeSchema,
+  roomInvitationSchema,
   suitedTileDetails,
   tileTypeIndex,
   type CommandAcknowledgement,
   type GameCommand,
   type GameSnapshot,
+  type RoomInvitation,
   type RoomView,
   type TileType,
 } from "@mahjong-together/shared";
@@ -451,6 +453,47 @@ function JoinRoom({
   setPending,
 }: JoinRoomProperties) {
   const validCode = roomCodeSchema.safeParse(code).success;
+  const [invitation, setInvitation] = useState<RoomInvitation | null>(null);
+  const [availabilityError, setAvailabilityError] = useState<Readonly<{
+    code: string;
+    message: string;
+  }> | null>(null);
+  const [preferredSeat, setPreferredSeat] = useState<number | null>(null);
+  const refreshInvitation = useCallback(async () => {
+    const invitation = await requestJson(
+      `/api/rooms/${code}/invitation`,
+      roomInvitationSchema,
+      controllerId,
+    );
+    setInvitation(invitation);
+    setPreferredSeat((current) =>
+      current === null || invitation.availableSeats.includes(current) ? current : null,
+    );
+    setAvailabilityError(null);
+  }, [code, controllerId]);
+
+  useEffect(() => {
+    if (!validCode) return;
+    const loadInvitation = async () => {
+      try {
+        await refreshInvitation();
+      } catch (caught) {
+        setAvailabilityError({ code, message: errorMessage(caught) });
+      }
+    };
+    void loadInvitation();
+  }, [code, refreshInvitation, validCode]);
+
+  const availableSeats = invitation?.code === code ? invitation.availableSeats : null;
+  const availabilityErrorMessage =
+    availabilityError?.code === code ? availabilityError.message : null;
+  const selectedSeat =
+    preferredSeat !== null && availableSeats?.includes(preferredSeat) ? preferredSeat : null;
+  const joinDisabled =
+    pending ||
+    availableSeats === null ||
+    availableSeats.length === 0 ||
+    availabilityErrorMessage !== null;
   return (
     <main>
       <section className="welcome-card" aria-labelledby="join-title">
@@ -463,8 +506,8 @@ function JoinRoom({
             </p>
             <NicknameForm
               buttonLabel="Join room"
-              disabled={pending}
-              error={error}
+              disabled={joinDisabled}
+              error={error ?? availabilityErrorMessage}
               fieldId="join-room-nickname"
               onSubmit={async (nickname) => {
                 onMutationStart();
@@ -476,7 +519,11 @@ function JoinRoom({
                     lobbyMutationAcknowledgementSchema,
                     controllerId,
                     {
-                      body: JSON.stringify({ commandId: crypto.randomUUID(), nickname }),
+                      body: JSON.stringify({
+                        commandId: crypto.randomUUID(),
+                        nickname,
+                        ...(selectedSeat === null ? {} : { seat: selectedSeat }),
+                      }),
                       headers: { "content-type": "application/json" },
                       method: "POST",
                     },
@@ -484,11 +531,44 @@ function JoinRoom({
                   await onJoined();
                 } catch (caught) {
                   setError(errorMessage(caught));
+                  await refreshInvitation().catch(() => undefined);
                 } finally {
                   setPending(false);
                 }
               }}
-            />
+            >
+              {availableSeats === null ? (
+                <p aria-live="polite">Checking available seats…</p>
+              ) : availableSeats.length === 0 ? (
+                <p className="error" role="alert">
+                  This room already has four players.
+                </p>
+              ) : (
+                <fieldset className="seat-picker">
+                  <legend>Choose a seat</legend>
+                  <label className="seat-choice">
+                    <input
+                      checked={selectedSeat === null}
+                      name="preferred-seat"
+                      onChange={() => setPreferredSeat(null)}
+                      type="radio"
+                    />
+                    First available
+                  </label>
+                  {availableSeats.map((seat) => (
+                    <label className="seat-choice" key={seat}>
+                      <input
+                        checked={selectedSeat === seat}
+                        name="preferred-seat"
+                        onChange={() => setPreferredSeat(seat)}
+                        type="radio"
+                      />
+                      {seatName(seat)}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+            </NicknameForm>
           </>
         ) : (
           <p className="error" role="alert">
@@ -503,13 +583,21 @@ function JoinRoom({
 
 type NicknameFormProperties = Readonly<{
   buttonLabel: string;
+  children?: ReactNode;
   disabled: boolean;
   error: string | null;
   fieldId: string;
   onSubmit: (nickname: string) => Promise<void>;
 }>;
 
-function NicknameForm({ buttonLabel, disabled, error, fieldId, onSubmit }: NicknameFormProperties) {
+function NicknameForm({
+  buttonLabel,
+  children,
+  disabled,
+  error,
+  fieldId,
+  onSubmit,
+}: NicknameFormProperties) {
   const [nickname, setNickname] = useState("");
   const submit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -527,8 +615,9 @@ function NicknameForm({ buttonLabel, disabled, error, fieldId, onSubmit }: Nickn
         required
         value={nickname}
       />
+      {children}
       <button disabled={disabled} type="submit">
-        {disabled ? "Please wait…" : buttonLabel}
+        {buttonLabel}
       </button>
       {error === null ? null : (
         <p className="error" role="alert">

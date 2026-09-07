@@ -32,6 +32,24 @@ describe("room lobby", () => {
     );
   });
 
+  it("offers only open seats and rejects a claimed seat without joining the guest", () => {
+    const store = new RoomStore({ codeFactory: () => "seatpicker01" });
+    const room = store.create(guest(1), "Host");
+
+    expect(store.getInvitation(room.code)).toEqual({
+      availableSeats: [1, 2, 3],
+      code: room.code,
+    });
+    expect(store.join(guest(2), room.code, "North", 3).viewerSeat).toBe(3);
+    expect(store.getInvitation(room.code).availableSeats).toEqual([1, 2]);
+
+    expect(() => store.join(guest(3), room.code, "Late North", 3)).toThrow(
+      expect.objectContaining({ code: "seat-unavailable" }),
+    );
+    expect(store.getCurrent(guest(3))).toBeNull();
+    expect(store.join(guest(3), room.code, "First free").viewerSeat).toBe(1);
+  });
+
   it("requires the host and every connected human to be ready, then fills bots", () => {
     const store = new RoomStore({ codeFactory: () => "roomcode0002" });
     const room = store.create(guest(1), "Host");
@@ -86,6 +104,37 @@ describe("room lobby", () => {
       phase: "awaiting-discard",
       rematchDeadline: null,
     });
+  });
+
+  it("lets a guest join a completed hand in an available bot seat without revealing it", () => {
+    const ended: HandEndedState = {
+      ...startHand("00000000-0000-4000-8000-000000000007", 0, createTileSet()),
+      phase: "hand-ended",
+      result: { kind: "draw" },
+    };
+    const store = new RoomStore({
+      codeFactory: () => "resultinvite",
+      handFactory: () => structuredClone(ended),
+    });
+    const room = store.create(guest(1), "Host");
+    store.setReady(guest(1), room.code, true);
+    store.start(guest(1), room.code);
+
+    expect(store.getInvitation(room.code).availableSeats).toEqual([1, 2, 3]);
+    const joined = store.join(guest(2), room.code, "Guest", 2);
+    expect(joined).toMatchObject({ viewerReady: false, viewerSeat: 2 });
+
+    expect(
+      store
+        .getGameSnapshot(guest(1), room.code)
+        .players.every((player) => player.concealedTiles !== null),
+    ).toBe(true);
+    expect(
+      store
+        .getGameSnapshot(guest(2), room.code)
+        .players.every((player) => player.concealedTiles === null),
+    ).toBe(true);
+    expect(store.getGameSnapshot(guest(2), room.code).result).toBeNull();
   });
 
   it("returns a completed table to a ready-reset lobby and clears bot seats", () => {

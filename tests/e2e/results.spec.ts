@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 test("a host can start the next hand from the completed result dialog", async ({ page }) => {
   await startCompletedHand(page);
@@ -58,6 +58,50 @@ test("a completed hand automatically rematches after fifteen seconds by default"
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+test("a result-screen host disconnect transfers one auto-rematch to the remaining human", async ({
+  browser,
+}) => {
+  const contexts: BrowserContext[] = [];
+  try {
+    const host = await newGuestPage(browser, contexts);
+    await host.goto("/");
+    await host.getByLabel("Nickname").fill("Host");
+    await host.getByRole("button", { name: "Create a private room" }).click();
+    const friend = await newGuestPage(browser, contexts);
+    await friend.goto(host.url());
+    await friend.getByLabel("Nickname").fill("Friend");
+    await friend.getByRole("button", { name: "Join room" }).click();
+
+    await host.getByRole("button", { name: "I’m ready" }).click();
+    await friend.getByRole("button", { name: "I’m ready" }).click();
+    await host.getByRole("button", { name: "Start hand" }).click();
+    await expect(host.getByRole("dialog", { name: "Draw hand" })).toBeVisible();
+    await expect(friend.getByRole("dialog", { name: "Draw hand" })).toBeVisible();
+
+    let rematchStarts = 0;
+    friend.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/start")) {
+        rematchStarts += 1;
+      }
+    });
+    const hostContext = contexts.shift();
+    if (hostContext === undefined) throw new Error("Missing host context");
+    await hostContext.close();
+
+    const resultDialog = friend.getByRole("dialog", { name: "Draw hand" });
+    await expect(resultDialog.getByRole("button", { name: "Play again" })).toBeEnabled();
+    await friend.waitForTimeout(14_000);
+    expect(rematchStarts).toBe(0);
+    await expect(resultDialog).toBeHidden({ timeout: 5_000 });
+    await expect(friend.getByLabel("South is dealer")).toBeVisible();
+    expect(rematchStarts).toBe(1);
+    await friend.waitForTimeout(1_000);
+    expect(rematchStarts).toBe(1);
+  } finally {
+    await Promise.all(contexts.map(async (context) => context.close()));
+  }
+});
+
 async function startCompletedHand(page: Page): Promise<void> {
   await page.goto("/");
   await page.getByLabel("Nickname").fill("Host");
@@ -65,4 +109,10 @@ async function startCompletedHand(page: Page): Promise<void> {
   await page.getByRole("button", { name: "I’m ready" }).click();
   await page.getByRole("button", { name: "Start hand" }).click();
   await expect(page.getByText("Draw hand", { exact: true })).toBeVisible();
+}
+
+async function newGuestPage(browser: Browser, contexts: BrowserContext[]): Promise<Page> {
+  const context = await browser.newContext();
+  contexts.push(context);
+  return context.newPage();
 }

@@ -323,4 +323,11 @@ Milestone 7 — Build the responsive, accessible playable mahjong table.
 
 ## Next exact step
 
-Implement and verify the three open lobby items above. Public deployment remains deliberately deferred for the user’s manual Render configuration, and Firefox remains deferred at the user’s direction.
+Complete remaining visual-direction work and the final stabilization audit. Public deployment remains deliberately deferred for the user’s manual Render configuration, and Firefox remains deferred at the user’s direction.
+
+## Lobby invitation, seating, and host-transfer feedback completed (2026-09-07)
+
+- A valid private invitation can now join a table during its three-minute completed-hand window. The server atomically selects an open or bot seat, resets the guest’s readiness, and never exposes the prior hand’s concealed tiles or result decomposition to that late joiner. Participants from the completed hand retain their normal result view.
+- Private invitations now fetch a deliberately minimal availability response and show **First available** plus only the open East, South, West, and North seat choices. Seat claims are server-validated; a simultaneous stale choice is rejected without creating a membership. A full room keeps the join form locked with a clear message.
+- Added two-human Chromium result coverage for host loss: the remaining human becomes host, no rematch begins in the first 14 seconds, the enabled auto-play starts exactly one rematch after the 15-second countdown, and the dealer rotates to South.
+- Verification: targeted RoomStore tests (17), the seven Chromium lobby flows, and the three Chromium result flows pass. Firefox remains deferred at the user’s direction.

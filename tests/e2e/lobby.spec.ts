@@ -46,11 +46,16 @@ test("isolated guests keep distinct seats through joins and refresh", async ({
     const inviteUrl = host.url();
 
     const guests: Page[] = [];
-    for (const expectedSeat of ["South", "West", "North"]) {
+    for (const [index, expectedSeat] of ["North", "South", "West"].entries()) {
       const guest = await newGuestPage(browser, contexts);
       guests.push(guest);
       await guest.goto(inviteUrl);
       await guest.getByLabel("Nickname").fill("Same name");
+      if (index === 0) {
+        await expect(guest.getByRole("radio", { name: "East" })).toHaveCount(0);
+        await guest.getByRole("radio", { name: "North" }).check();
+      }
+      if (index === 1) await expect(guest.getByRole("radio", { name: "North" })).toHaveCount(0);
       await guest.getByRole("button", { name: "Join room" }).click();
       await expect(guest.getByText(`You are ${expectedSeat}`)).toBeVisible();
     }
@@ -67,14 +72,13 @@ test("isolated guests keep distinct seats through joins and refresh", async ({
     expect((await refreshed).status()).toBe(200);
 
     await guests[0].reload();
-    await expect(guests[0].getByText("You are South")).toBeVisible();
+    await expect(guests[0].getByText("You are North")).toBeVisible();
     await expect(guests[0].getByRole("button", { name: "Start hand" })).toHaveCount(0);
 
     const fifth = await newGuestPage(browser, contexts);
     await fifth.goto(inviteUrl);
-    await fifth.getByLabel("Nickname").fill("Fifth player");
-    await fifth.getByRole("button", { name: "Join room" }).click();
-    await expect(fifth.getByRole("alert")).toHaveText("This room already has four players");
+    await expect(fifth.getByRole("alert")).toHaveText("This room already has four players.");
+    await expect(fifth.getByRole("button", { name: "Join room" })).toBeDisabled();
   } finally {
     await Promise.all(contexts.map(async (context) => context.close()));
   }
@@ -358,22 +362,36 @@ test("a room already occupied by this tab expires after a reload with no server 
   await expect(page.getByRole("heading", { name: "Mahjong Together" })).toBeVisible();
 });
 
-test("a stale occupied-room marker does not block a different invite", async ({ page }) => {
+test("a stale occupied-room marker does not block a different invite", async ({
+  page,
+  browser,
+}) => {
   await page.goto("/");
   await createRoom(page, "Host");
-  await page.route("**/api/rooms/current", async (route) => {
-    await route.fulfill({ contentType: "application/json", json: { room: null }, status: 200 });
-  });
+  await page.getByRole("button", { name: "Leave game" }).click();
 
-  await page.goto("/room/freshroom001");
+  await page.evaluate(() =>
+    window.sessionStorage.setItem("mahjong-together:occupied-room", "stale0000000"),
+  );
 
-  await expect(page.getByRole("heading", { name: "Join Mahjong Together" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Join room" })).toBeEnabled();
-  await expect
-    .poll(() =>
-      page.evaluate(() => window.sessionStorage.getItem("mahjong-together:occupied-room")),
-    )
-    .toBeNull();
+  const freshContext = await browser.newContext();
+  try {
+    const freshHost = await freshContext.newPage();
+    await freshHost.goto("/");
+    await createRoom(freshHost, "Fresh host");
+
+    await page.goto(freshHost.url());
+
+    await expect(page.getByRole("heading", { name: "Join Mahjong Together" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Join room" })).toBeEnabled();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.sessionStorage.getItem("mahjong-together:occupied-room")),
+      )
+      .toBeNull();
+  } finally {
+    await freshContext.close();
+  }
 });
 
 async function newGuestPage(browser: Browser, contexts: BrowserContext[]): Promise<Page> {

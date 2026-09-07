@@ -6,6 +6,7 @@ import {
   type CommandAcknowledgement,
   type GameCommand,
   type GameSnapshot,
+  type RoomInvitation,
   type RoomView,
 } from "@mahjong-together/shared";
 
@@ -30,6 +31,7 @@ type HumanSeat = {
   connected: boolean;
   guestId: string;
   host: boolean;
+  joinedHandId: string | null;
   joinedOrder: number;
   kind: "human";
   nickname: string;
@@ -137,26 +139,38 @@ export class RoomStore {
     return viewFor(room, session.guestId);
   }
 
-  join(session: GuestSession, code: string, nickname: string): RoomView {
+  join(session: GuestSession, code: string, nickname: string, preferredSeat?: number): RoomView {
     this.cleanupExpired();
     const currentCode = this.#guestRooms.get(session.guestId);
     if (currentCode === code) return this.getForGuest(session, code);
     this.assertGuestIsFree(session.guestId);
 
     const room = this.requireRoom(code);
-    if (room.phase !== "lobby") {
+    if (!isJoinable(room)) {
       throw new RoomError("room-active", "This hand has already started");
     }
-    const seat = room.seats.findIndex((occupant) => occupant === null);
-    if (seat === -1) throw new RoomError("room-full", "This room already has four players");
+    const availableSeats = availableJoinSeats(room);
+    if (availableSeats.length === 0)
+      throw new RoomError("room-full", "This room already has four players");
+    const seat = (preferredSeat as SeatIndex | undefined) ?? availableSeats[0];
+    if (seat === undefined || !availableSeats.includes(seat)) {
+      throw new RoomError("seat-unavailable", "That seat is no longer available");
+    }
 
-    room.seats[seat as SeatIndex] = this.createHumanSeat(session.guestId, nickname, false);
+    room.seats[seat] = this.createHumanSeat(session.guestId, nickname, false);
     room.lastActivityAt = this.#clock();
     room.noConnectedHumansSince = null;
     room.roomRevision += 1;
     this.#guestRooms.set(session.guestId, code);
     this.notify(code);
     return viewFor(room, session.guestId);
+  }
+
+  getInvitation(code: string): RoomInvitation {
+    this.cleanupExpired();
+    const room = this.requireRoom(code);
+    if (!isJoinable(room)) throw new RoomError("room-active", "This hand has already started");
+    return { availableSeats: availableJoinSeats(room), code: room.code };
   }
 
   getCurrent(session: GuestSession): RoomView | null {
@@ -219,6 +233,9 @@ export class RoomStore {
         return dealerIndex as SeatIndex;
       })();
     room.hand = this.#handFactory(dealer);
+    for (const occupant of room.seats) {
+      if (occupant?.kind === "human") occupant.joinedHandId = room.hand.handId;
+    }
     room.nextDealer = rotateDealer(room.hand.dealer);
     room.phase = "active";
     if (room.hand.phase === "hand-ended") this.scheduleRematchExpiry(room);
@@ -643,9 +660,7 @@ export class RoomStore {
       wallRemaining: hand.wall.length,
     };
 
-    return chooseBotAction(
-      claimedTile !== undefined ? { ...baseView, claimedTile } : baseView,
-    );
+    return chooseBotAction(claimedTile !== undefined ? { ...baseView, claimedTile } : baseView);
   }
 
   isBotControlled(room: Room, seat: SeatIndex): boolean {
@@ -705,6 +720,7 @@ export class RoomStore {
       connected: true,
       guestId,
       host,
+      joinedHandId: null,
       joinedOrder: this.#joinSequence,
       kind: "human",
       nickname,
@@ -809,7 +825,9 @@ export class RoomStore {
 function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapshot {
   const hand = room.hand;
   if (hand === null) throw new Error("Active hand invariant failed");
-  const revealAll = hand.phase === "hand-ended";
+  const viewer = room.seats[viewerSeat];
+  const viewerPlayedHand = viewer?.kind === "human" && viewer.joinedHandId === hand.handId;
+  const revealAll = hand.phase === "hand-ended" && viewerPlayedHand;
   const pendingDiscard =
     hand.phase === "awaiting-discard-claims"
       ? {
@@ -849,7 +867,8 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
       }
       return {
         concealedCount: player.concealed.length,
-        concealedTiles: revealAll || seat === viewerSeat ? player.concealed : null,
+        concealedTiles:
+          revealAll || (viewerPlayedHand && seat === viewerSeat) ? player.concealed : null,
         connected: occupant.kind === "human" && occupant.connected,
         controller: occupant.kind === "bot" || !occupant.connected ? "bot" : "human",
         discards: player.discards,
@@ -857,13 +876,16 @@ function snapshotFor(room: Room, viewerSeat: SeatIndex, now: number): GameSnapsh
           concealed: meld.concealed,
           kind: meld.kind,
           tileCount: meld.tiles.length,
-          tiles: !revealAll && meld.concealed && seat !== viewerSeat ? null : meld.tiles,
+          tiles:
+            !revealAll && meld.concealed && (seat !== viewerSeat || !viewerPlayedHand)
+              ? null
+              : meld.tiles,
         })),
         nickname: occupant.kind === "human" ? occupant.nickname : null,
         seat,
       };
     }),
-    result: hand.phase === "hand-ended" ? hand.result : null,
+    result: hand.phase === "hand-ended" && viewerPlayedHand ? hand.result : null,
     roomId: room.code,
     roomRevision: room.roomRevision,
     serverTime: now,
@@ -944,6 +966,18 @@ function rejectedCommand(
 function findHumanSeat(room: Room, guestId: string): SeatIndex | null {
   const index = room.seats.findIndex((seat) => seat?.kind === "human" && seat.guestId === guestId);
   return index === -1 ? null : (index as SeatIndex);
+}
+
+function isJoinable(room: Room): boolean {
+  return room.phase === "lobby" || room.hand?.phase === "hand-ended";
+}
+
+function availableJoinSeats(room: Room): SeatIndex[] {
+  return room.seats.flatMap((occupant, index) =>
+    occupant === null || (room.hand?.phase === "hand-ended" && occupant.kind === "bot")
+      ? [index as SeatIndex]
+      : [],
+  );
 }
 
 function generateRoomCode(): string {
