@@ -11,12 +11,11 @@ test("a host can start the next hand from the completed result dialog", async ({
   await page.getByRole("button", { name: "View result" }).click();
   await expect(resultDialog).toBeVisible();
   await resultDialog.getByRole("button", { name: "Show other hands" }).click();
-  await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toBeVisible();
-  await expect(
-    page.getByRole("dialog", { name: "Other players’ hands" }).locator(".opponent-hand"),
-  ).toHaveCount(3);
-  await page.getByRole("button", { name: "Close Other players’ hands" }).click();
-  await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toHaveCount(0);
+  const opponentHands = resultDialog.locator("#opponent-hands");
+  await expect(opponentHands).toBeVisible();
+  await expect(opponentHands.locator(".opponent-hand")).toHaveCount(3);
+  await resultDialog.getByRole("button", { name: "Hide other hands" }).click();
+  await expect(opponentHands).toHaveCount(0);
   await expect(resultDialog).toBeVisible();
   const autoPlay = resultDialog.getByRole("checkbox", { name: /Auto-play next hand/ });
   await expect(autoPlay).toBeChecked();
@@ -38,6 +37,46 @@ test("a host can start the next hand from the completed result dialog", async ({
   await expect(resultDialog).toBeHidden();
   await expect(page.locator(".table-felt")).toBeVisible();
   expect(rematchStarts).toBe(1);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("the next hand stays interactive when the other hands panel was left open", async ({
+  page,
+}) => {
+  await startCompletedHand(page);
+
+  const resultDialog = page.getByRole("dialog", { name: "Draw hand" });
+  await resultDialog.getByRole("button", { name: "Show other hands" }).click();
+  await expect(resultDialog.locator("#opponent-hands")).toBeVisible();
+
+  await resultDialog.getByRole("button", { name: "Play again" }).click();
+
+  await expect(resultDialog).toHaveCount(0);
+  await expect(page.locator("#opponent-hands")).toHaveCount(0);
+  await expect(page.locator(".table-felt")).toBeVisible();
+  await expect(page.locator("#root")).not.toHaveAttribute("inert");
+  await page.getByRole("button", { name: "Table menu" }).click();
+  await expect(page.getByRole("dialog", { name: "Table menu" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("escape closes the result dialog and leaves the table interactive", async ({ page }) => {
+  await startCompletedHand(page);
+
+  const resultDialog = page.getByRole("dialog", { name: "Draw hand" });
+  await resultDialog.getByRole("button", { name: "Show other hands" }).click();
+  await expect(resultDialog.locator("#opponent-hands")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(resultDialog).toHaveCount(0);
+  await expect(page.locator("#root")).not.toHaveAttribute("inert");
+
+  // Reopening and starting the next hand keeps this test at two started hands, which the
+  // fixture's alternating completed/in-play parity depends on.
+  await page.getByRole("button", { name: "View result" }).click();
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole("button", { name: "Play again" }).click();
+  await expect(page.locator(".table-felt")).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 

@@ -16,10 +16,10 @@ test("a later completed hand reopens the result dialog after the prior one was c
   await page.getByRole("button", { name: "View result" }).click();
   await expect(resultDialog).toBeVisible();
   await resultDialog.getByRole("button", { name: "Show other hands" }).click();
-  await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toBeVisible();
+  await expect(resultDialog.locator("#opponent-hands")).toBeVisible();
 
   await page.waitForTimeout(16_000);
   await expect(resultDialog).toBeVisible();
   await expect(page.getByRole("button", { name: "View result" })).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "Other players’ hands" })).toHaveCount(0);
+  await expect(page.locator("#opponent-hands")).toHaveCount(0);
 });

@@ -1232,6 +1232,21 @@ a {
   background: var(--danger);
 }
 
+.result-opponent-hands {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding-top: 0.35rem;
+}
+
+.result-opponent-hands h3 {
+  margin: 0.85rem 0 0;
+  font-size: 1.05rem;
+}
+
+.result-opponent-hands .dialog-intro {
+  font-size: 0.85rem;
+}
+
 .opponent-hand-grid {
   display: grid;
   gap: 0.65rem;

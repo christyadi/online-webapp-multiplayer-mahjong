@@ -1297,10 +1297,13 @@ function Table({
             game={game}
             onClose={() => setClosedResultHandId(game.handId)}
             onToggleAutoPlay={() => setAutoPlayAgain((enabled) => !enabled)}
-            onShowOpponentTiles={() => setOpponentTilesHandId(game.handId)}
+            onToggleOpponentTiles={() =>
+              setOpponentTilesHandId((current) => (current === game.handId ? null : game.handId))
+            }
             onPlayAgain={startNextHand}
             pending={pending}
             rematchSeconds={rematchSeconds}
+            showOpponentTiles={opponentTilesHandId === game.handId}
           />
         )}
         {showTableMenu ? (
@@ -1323,9 +1326,6 @@ function Table({
               setShowTableMenu(true);
             }}
           />
-        ) : null}
-        {opponentTilesHandId === game.handId ? (
-          <OpponentHandsDialog game={game} onClose={() => setOpponentTilesHandId(null)} />
         ) : null}
         {error === null ? null : (
           <p className="error" role="alert">
@@ -1531,15 +1531,12 @@ function TableMenu({
   );
 }
 
-function OpponentHandsDialog({
-  game,
-  onClose,
-}: Readonly<{
-  game: GameSnapshot;
-  onClose: () => void;
-}>) {
+// Revealed inside the result dialog rather than as a second dialog on top of it: stacking two
+// modals hid the result actions behind the panel and made the layers close out of order.
+function OpponentHands({ game }: Readonly<{ game: GameSnapshot }>) {
   return (
-    <TableDialog id="opponent-hands" onClose={onClose} title="Other players’ hands">
+    <section className="result-opponent-hands" id="opponent-hands">
+      <h3>Other players’ hands</h3>
       <p className="dialog-intro">Hands are sorted by suit and rank after this hand only.</p>
       <div className="opponent-hand-grid">
         {game.players
@@ -1565,9 +1562,14 @@ function OpponentHandsDialog({
             );
           })}
       </div>
-    </TableDialog>
+    </section>
   );
 }
+
+// The inert application root is refcounted across every open dialog rather than snapshotted per
+// dialog. With a per-dialog snapshot, any two dialogs alive at once let the last one to unmount
+// restore a stale `true` and leave the whole app unclickable with nothing visible to close.
+const openDialogs: symbol[] = [];
 
 function TableDialog({
   className = "",
@@ -1599,11 +1601,14 @@ function TableDialog({
         ? previouslyFocused
         : (triggeringControl ?? previouslyFocused);
     const applicationRoot = document.querySelector<HTMLElement>("#root");
-    const wasInert = applicationRoot?.inert ?? false;
+    const token = Symbol(id);
+    openDialogs.push(token);
     if (applicationRoot !== null) applicationRoot.inert = true;
     closeButton.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Every open dialog listens on the window, so only the topmost one reacts.
+      if (openDialogs.at(-1) !== token) return;
       if (event.key === "Escape") {
         event.preventDefault();
         closeHandler.current();
@@ -1642,7 +1647,11 @@ function TableDialog({
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      if (applicationRoot !== null) applicationRoot.inert = wasInert;
+      const openIndex = openDialogs.indexOf(token);
+      if (openIndex !== -1) openDialogs.splice(openIndex, 1);
+      // Another dialog is still open, so it keeps owning the inert root and the focus.
+      if (openDialogs.length > 0) return;
+      if (applicationRoot !== null) applicationRoot.inert = false;
       returnFocus?.focus();
     };
   }, [id]);
@@ -1692,11 +1701,14 @@ function publicActionSince(previous: GameSnapshot, game: GameSnapshot): string |
   for (const player of game.players) {
     const previousMelds =
       previous.players.find((candidate) => candidate.seat === player.seat)?.melds ?? [];
-    const changedMeld = player.melds.find(
-      (meld, index) =>
-        previousMelds[index]?.kind !== meld.kind ||
-        previousMelds[index]?.tileCount !== meld.tileCount,
-    );
+    const changedMeld = player.melds.find((meld, index) => {
+      const previousMeld = previousMelds.at(index);
+      return (
+        previousMeld === undefined ||
+        previousMeld.kind !== meld.kind ||
+        previousMeld.tileCount !== meld.tileCount
+      );
+    });
     if (changedMeld !== undefined) return meldActionLabel(game, player.seat, changedMeld.kind);
   }
 
@@ -1931,10 +1943,11 @@ function ResultDialog({
   game,
   onClose,
   onToggleAutoPlay,
-  onShowOpponentTiles,
+  onToggleOpponentTiles,
   onPlayAgain,
   pending,
   rematchSeconds,
+  showOpponentTiles,
 }: Readonly<{
   autoPlayAgain: boolean;
   autoPlaySeconds: number | null;
@@ -1942,10 +1955,11 @@ function ResultDialog({
   game: GameSnapshot;
   onClose: () => void;
   onToggleAutoPlay: () => void;
-  onShowOpponentTiles: () => void;
+  onToggleOpponentTiles: () => void;
   onPlayAgain: () => void;
   pending: boolean;
   rematchSeconds: number | null;
+  showOpponentTiles: boolean;
 }>) {
   const result = game.result;
   if (result === null) return null;
@@ -1993,13 +2007,15 @@ function ResultDialog({
         </label>
         <button
           aria-controls="opponent-hands"
+          aria-expanded={showOpponentTiles}
           className="secondary"
-          onClick={onShowOpponentTiles}
+          onClick={onToggleOpponentTiles}
           type="button"
         >
-          Show other hands
+          {showOpponentTiles ? "Hide other hands" : "Show other hands"}
         </button>
       </div>
+      {showOpponentTiles ? <OpponentHands game={game} /> : null}
     </TableDialog>
   );
 }
